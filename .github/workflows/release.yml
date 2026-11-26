@@ -25,9 +25,7 @@ jobs:
       - name: Check release version
         shell: pwsh
         run: |
-          $tag = '${{ github.ref_name }}'
-          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ($tag -ne "v$version") { throw "Tag $tag does not match package version $version" }
+          node scripts/check-release-version.mjs '${{ github.ref_name }}'
       - name: Install dependencies
         run: npm ci
       - name: Verify geometry, calculations and IFC
@@ -47,6 +45,14 @@ jobs:
           if ($installer.Count -ne 1) { throw "Expected one NSIS installer; found $($installer.Count)" }
           $signature = "$($installer[0].FullName).sig"
           if (!(Test-Path -LiteralPath $signature)) { throw "Updater signature missing: $signature" }
+          $safeName = $installer[0].Name.Replace(' ', '.')
+          if ($safeName -ne $installer[0].Name) {
+            $safeInstaller = Join-Path $installer[0].DirectoryName $safeName
+            Move-Item -LiteralPath $installer[0].FullName -Destination $safeInstaller
+            Move-Item -LiteralPath $signature -Destination "$safeInstaller.sig"
+            $installer = @(Get-Item -LiteralPath $safeInstaller)
+            $signature = "$safeInstaller.sig"
+          }
           $env:OSS_RELEASE_TAG = $tag
           $env:OSS_INSTALLER_NAME = $installer[0].Name
           $env:OSS_SIGNATURE_PATH = $signature
