@@ -270,7 +270,9 @@
   function showSession(next) {
     session = next;
     model = next.model;
-    selectedItem = model.stair.mark;
+    selectedItem = model.stairEnabled ? model.stair.mark : '';
+    if (!model.stairEnabled && activeView !== 'Trapontwerp') activeView = 'Projectstart';
+    if (model.stairEnabled && activeView === 'Projectstart') activeView = '3D-model';
     history = next.history;
     future = next.future;
     dirty = isDirty(next);
@@ -318,11 +320,12 @@
     const next = freshDesign();
     next.project = { ...next.project, name: 'Nieuw trapproject', number: 'OSS-NIEUW', revision: 'A' };
     next.stair = { ...next.stair, mark: 'TR-01', name: 'Nieuwe trap' };
+    next.stairEnabled = false;
     resetPartSelection();
     resetCamera();
     commitSession(startSession(next, false), 'Nieuw trapproject aangemaakt');
     hostContext=null;
-    wellSelection=''; activeRibbon='Trap ontwerpen'; activeView='3D-model'; rightTab='Eigenschappen';
+    wellSelection=''; activeRibbon='Trap ontwerpen'; activeView='Projectstart'; rightTab='Eigenschappen';
   }
   function downloadFile(name, content, type) {
     const blob = new Blob([content], { type });
@@ -344,6 +347,7 @@
   }
   const csvCell = value => `"${String(value ?? '').replaceAll('"', '""')}"`;
   function exportPartsCsv() {
+    if (!model.stairEnabled) return notify('Kies eerst een traptype.');
     if (invalidGeometry) return notify(invalidGeometry.detail);
     if (housingIssues.length) return notify(housingIssues[0].message);
     const rows = timberSystem ? makePartsCsvRows(workshop, model.stair.material, { treads: treadParts, margin: model.treadCam.stockMargin }) : referenceRows;
@@ -351,12 +355,14 @@
     notify('Onderdelenstaat als CSV geëxporteerd');
   }
   function exportPlanDxf() {
+    if (!model.stairEnabled) return notify('Kies eerst een traptype.');
     if (invalidGeometry) return notify(invalidGeometry.detail);
     const dxf = createPlanDxf(geometry);
     downloadFile(`${model.stair.mark}-plattegrond.dxf`, dxf, 'application/dxf');
     notify('2D-contour als DXF geëxporteerd · mm');
   }
   async function exportIfc() {
+    if (!model.stairEnabled) return notify('Kies eerst een traptype.');
     if (invalidGeometry) return notify(invalidGeometry.detail);
     const exportModel = model;
     const exportGeometry = {...geometry,detailParts:details};
@@ -391,8 +397,8 @@
   }
   function saveProject() {
     if (document.activeElement instanceof HTMLInputElement && document.activeElement.type === 'number') document.activeElement.blur();
-    const projectFile={...model,designSelection:activeView==='Trapontwerp'?wellItem?.id??null:null};
-    downloadFile(`${model.project.number}-${activeView==='Trapontwerp'&&wellItem?wellItem.mark:model.stair.mark}.oss.json`, JSON.stringify(projectFile, null, 2), 'application/json');
+    const projectFile={...model,stair:model.stairEnabled?model.stair:null,designSelection:activeView==='Trapontwerp'?wellItem?.id??null:null};
+    downloadFile(`${model.project.number}-${activeView==='Trapontwerp'&&wellItem?wellItem.mark:model.stairEnabled?model.stair.mark:'leeg-project'}.oss.json`, JSON.stringify(projectFile, null, 2), 'application/json');
     commitSession({ ...session, savedModel: JSON.stringify(model) }, 'Download van OSS-projectbestand gestart');
   }
   async function openProject(event) {
@@ -408,7 +414,7 @@
       resetPartSelection();
       resetCamera();
       commitSession(startSession(next), 'Project geopend');
-      activeView='3D-model';activeRibbon='Trap ontwerpen';woodView='all';
+      activeView=next.stairEnabled?'3D-model':'Projectstart';activeRibbon='Trap ontwerpen';woodView='all';
       restoreDesign(next);
     } catch (error) {
       if (request === openRequest) notify(`Openen mislukt: ${error.message}`);
@@ -472,7 +478,7 @@
       <button class="quick-button" title="Opnieuw" disabled={!future.length} onclick={redo}><Icon name="edit.redo" /></button>
     </div>
     <div class="caption" data-tauri-drag-region>
-      <span class="document-name">{model.project.name} · {activeView==='Trapontwerp'?'Trapontwerp':model.stair.mark+' '+model.stair.name}</span>
+      <span class="document-name">{model.project.name} · {activeView==='Trapontwerp'?'Trapontwerp':model.stairEnabled?model.stair.mark+' '+model.stair.name:'Nog geen trap'}</span>
       {#if dirty}<i class="dirty-indicator" title="Niet opgeslagen"></i>{/if}
       <span class="titlebar-divider"></span><strong>Open Stair Studio</strong>
     </div>
@@ -495,7 +501,7 @@
       <div class="ribbon-group"><div class="ribbon-group-buttons"><button class="ribbon-command" onclick={openTimberExample}><Icon name="frame.layout" size={24}/><span>Klassieke houten<br/>kwartslag</span></button></div><small>Voorbeeldproject</small></div>
     {:else if activeRibbon === 'Trap ontwerpen'}
       <div class="ribbon-group design-families"><label for="ontwerp-type">Traptype ontwerpen</label>
-        <select id="ontwerp-type" onchange={e=>chooseFamily(e.currentTarget.value)} value={activeView==='Trapontwerp'?(wellItem?.type??''):model.stair.type}>
+        <select id="ontwerp-type" onchange={e=>chooseFamily(e.currentTarget.value)} value={activeView==='Trapontwerp'?(wellItem?.type??''):model.stairEnabled?model.stair.type:''}>
           <option value="" disabled>Kies een traptype</option>
           <optgroup label="Houten trappen">{#each stairFamilies as f}<option value={f.id}>{f.label}</option>{/each}</optgroup>
           <optgroup label="Trappen en ladders">{#each componentTypes as t}<option value={t.id}>{t.label}</option>{/each}</optgroup>
@@ -530,12 +536,12 @@
   </section>
 
   <div class="document-tabs oa-document-tabs" use:blueprintTabs aria-label="Modelweergaven" role="tablist">
-    {#if activeView==='Trapontwerp'}<button class="oa-document-tab active" role="tab" aria-selected="true" onclick={()=>openWell()}><Icon name="frame.layout" size={16}/>Trap ontwerpen{wellItem?' · '+wellItem.mark:''}</button>{:else}
+    {#if activeView==='Trapontwerp'}<button class="oa-document-tab active" role="tab" aria-selected="true" onclick={()=>openWell()}><Icon name="frame.layout" size={16}/>Trap ontwerpen{wellItem?' · '+wellItem.mark:''}</button>{:else if !model.stairEnabled}<button class="oa-document-tab active" role="tab" aria-selected="true"><Icon name="file.new" size={16}/>Nieuw project</button>{:else}
     {#each views as tab}
       <button class="oa-document-tab" role="tab" aria-selected={activeView === tab.id} class:active={activeView === tab.id} onclick={() => tab.id === 'Trapontwerp' ? openWell() : activeView = tab.id}><Icon name={tab.icon} size={16} />{tab.id}</button>
     {/each}
     {/if}
-    <span class="document-tab-spacer"></span><span class="document-revision">{model.project.number} · {activeView==='Trapontwerp'?(wellItem?.mark??'Trapontwerp'):model.stair.mark} · REV {model.project.revision}</span>
+    <span class="document-tab-spacer"></span><span class="document-revision">{model.project.number} · {activeView==='Trapontwerp'?(wellItem?.mark??'Trapontwerp'):model.stairEnabled?model.stair.mark:'0 trappen'} · REV {model.project.revision}</span>
   </div>
 
   <main class="workspace">
@@ -547,25 +553,27 @@
           <div class="tree-root"><span class="chevron">⌄</span><Icon name="file.structure" /><div><b>{model.project.name}</b><small>{model.project.number} · Revisie {model.project.revision}</small></div></div>
           <div class="tree-node"><span class="chevron">⌄</span><span class="tree-emoji">▱</span><b>Verdieping 01</b></div>
           <div class="tree-node nest"><span class="chevron">⌄</span><span class="tree-emoji">⌑</span><b>Gebouwcontext</b><span class="tree-muted">{hostContext?'IFC ingelezen':'niet gekoppeld'}</span></div>
-          <div class="tree-node nest"><span class="chevron">⌄</span><span class="tree-emoji">⌁</span><b>Trappen</b><span class="tree-count">1</span></div>
+          <div class="tree-node nest"><span class="chevron">⌄</span><span class="tree-emoji">⌁</span><b>Trappen</b><span class="tree-count">{Number(model.stairEnabled) + well.instances.length}</span></div>
+          {#if model.stairEnabled}
           <button class="tree-item" class:selected={activeView!=='Trapontwerp' && selectedItem === model.stair.mark} onclick={() => {selectedItem=model.stair.mark; activeView='3D-model';activeRibbon='Trap ontwerpen';}}><span class="tree-indent"></span><span class="tree-stair-icon">▱</span><div><b>{model.stair.mark} · {model.stair.name}</b><small>{dimensions.family.label} · Concept</small></div></button>
           <div class="tree-child"><span class="tree-indent"></span><span>└</span><span>Treden</span><small>{dimensions.treadCount}</small></div>
           <div class="tree-child"><span class="tree-indent"></span><span>└</span><span>{dimensions.family.winder ? 'Wangdelen' : 'Trapbomen'}</span><small>{geometry.stringers.length}</small></div>
           <div class="tree-child"><span class="tree-indent"></span><span>└</span><span>Leuning</span><small>{model.stair.railSide && model.stair.railSide!=='none' ? 'Gemodelleerd' : 'Zonder leuning'}</small></div>
+          {:else if !well.instances.length}<p class="empty-tree-note">Nog geen trap toegevoegd.</p>{/if}
           <div class="tree-node collapsed"><span class="chevron">›</span><span class="tree-emoji">▱</span><b>Begane grond</b></div>
           <button class="add-tree-item" onclick={()=>openWell()}>Projectopstelling · {well.instances.length} ontwerpen</button>
           {#each [...well.instances].sort((a,b)=>a.storey-b.storey) as i}<button class="tree-item" class:selected={activeView==='Trapontwerp'&&wellItem?.id===i.id} onclick={()=>openWell(i.id)}><span class="tree-indent"></span><Icon name="bim.workspace" size={16}/><div><b>{i.mark} · {typeOf(i.type).label}</b><small>Bouwlaag {i.storey} → {i.storey+1}</small></div></button>{/each}
         </div>
       {:else}
-        <div class="library-pane"><div class="library-search"><Icon name="view.search" /><input bind:value={libraryQuery} aria-label="Zoek trapmodellen" placeholder="Zoek trapmodellen" /></div><span class="eyebrow">TRAPFAMILIES</span>{#each visibleFamilies as family}<button class="library-item" class:family-selected={model.stair.type === family.id} onclick={() => chooseFamily(family.id)}><span class="library-glyph">{family.icon}</span><span>{family.label}</span><small>{model.stair.type === family.id ? 'Actief' : 'Beschikbaar'}</small></button>{/each}{#if visibleComponents.length}<span class="eyebrow">TRAPPEN EN LADDERS</span>{#each visibleComponents as t}<button class="library-item" onclick={()=>chooseFamily(t.id)}><Icon name="bim.workspace" size={16}/><span>{t.label}</span><small>Ontwerpen</small></button>{/each}{/if}{#if !visibleFamilies.length && !visibleComponents.length}<p>Geen trapfamilie gevonden.</p>{/if}</div>
+        <div class="library-pane"><div class="library-search"><Icon name="view.search" /><input bind:value={libraryQuery} aria-label="Zoek trapmodellen" placeholder="Zoek trapmodellen" /></div><span class="eyebrow">TRAPFAMILIES</span>{#each visibleFamilies as family}<button class="library-item" class:family-selected={model.stairEnabled && model.stair.type === family.id} onclick={() => chooseFamily(family.id)}><span class="library-glyph">{family.icon}</span><span>{family.label}</span><small>{model.stairEnabled && model.stair.type === family.id ? 'Actief' : 'Beschikbaar'}</small></button>{/each}{#if visibleComponents.length}<span class="eyebrow">TRAPPEN EN LADDERS</span>{#each visibleComponents as t}<button class="library-item" onclick={()=>chooseFamily(t.id)}><Icon name="bim.workspace" size={16}/><span>{t.label}</span><small>Ontwerpen</small></button>{/each}{/if}{#if !visibleFamilies.length && !visibleComponents.length}<p>Geen trapfamilie gevonden.</p>{/if}</div>
       {/if}
       <div class="panel-bottom"><div class="project-meta-title">PROJECTSTATUS</div><div class="meta-row"><span>Ontwerpfase</span><b>Concept</b></div><div class="meta-row"><span>Regelprofiel</span><b>{ruleProfiles.find(p => p.id === model.regulatory.profile)?.label ?? 'Geen profiel'}</b></div><div class="meta-row"><span>Modelbeheer</span><b>{dirty ? 'Niet opgeslagen' : 'Lokaal model'}</b></div></div>
     </aside>
     <BlueprintSplitter side="left" />
 
     <section class="editor-area">
-      <div class="print-heading"><strong>{model.project.name}</strong><span>{model.project.number} · revisie {model.project.revision} · {activeView==='Trapontwerp'?'Trapontwerp':model.stair.mark+' '+model.stair.name}</span><span>{activeView} · concept</span></div>
-      <header class="view-toolbar"><div class="view-heading"><b>{activeView === '3D-model' ? '3D-model' : activeView}</b><span class="view-context">{activeView==='Trapontwerp' ? (wellItem?.mark??model.project.number) : model.stair.mark+' · '+model.stair.name} · millimeters</span></div>{#if drawingView && !invalidGeometry}
+      <div class="print-heading"><strong>{model.project.name}</strong><span>{model.project.number} · revisie {model.project.revision} · {activeView==='Trapontwerp'?'Trapontwerp':model.stairEnabled?model.stair.mark+' '+model.stair.name:'Nog geen trap'}</span><span>{activeView} · concept</span></div>
+      <header class="view-toolbar"><div class="view-heading"><b>{!model.stairEnabled && activeView!=='Trapontwerp' ? 'Leeg project' : activeView === '3D-model' ? '3D-model' : activeView}</b><span class="view-context">{activeView==='Trapontwerp' ? (wellItem?.mark??model.project.number) : model.stairEnabled?model.stair.mark+' · '+model.stair.name:'Kies een traptype'} · millimeters</span></div>{#if model.stairEnabled && drawingView && !invalidGeometry}
         <div class="view-tools">
           {#if activeView === '3D-model'}
             <button class="tool-button" title="Draai het model 90°" onclick={() => viewport?.rotateQuarter()}>↻ Draai 90°</button>
@@ -581,6 +589,8 @@
 
       {#if activeView === 'Trapontwerp'}
         <StairwellView bind:this={wellWorkspace} {well} instance={wellItem} {assemblies} project={model.project} add={addWell} {addConcreteExample} exportIfc={exportWellIfc} {downloadFile} change={changeWell}/>
+      {:else if !model.stairEnabled}
+        <div class="production-view empty-project"><span class="eyebrow">NIEUW PROJECT · 0 TRAPPEN</span><h1>Begin met een traptype</h1><p>Dit project bevat nog geen trap. Kies hieronder een traptype of gebruik de bibliotheek links.</p><div class="empty-project-choices">{#each stairFamilies as family}<button class="action-btn" onclick={() => chooseFamily(family.id)}>{family.icon} {family.label}</button>{/each}</div><p>Voor andere trappen en ladders kies je een type onder <b>Trap ontwerpen</b>.</p></div>
       {:else if activeView === 'Engineering'}
         {#if invalidGeometry}<p class="context-warning">{invalidGeometry.detail}</p>{/if}
         <EngineeringView {model} {geometry} {dossier} {updateEngineering} {downloadFile}/>
@@ -700,14 +710,16 @@
           <div class="coordinate-label">ORTHOGONAAL · mm</div>
         </div>
       {/if}
-      {#if activeView==='Trapontwerp'}<div class="canvas-status"><span><i></i>{well.instances.length} componenten</span><span>Schacht {well.length} × {well.width} mm</span><span>Verdiepingshoogte {well.storeyHeight} mm</span></div>{:else}<div class="canvas-status"><span><i></i>{invalidGeometry ? 'Geometrie onvolledig' : activeView === '3D-model' ? 'Model actueel' : activeView === 'Onderdelen' ? 'Stukstaat bijgewerkt' : 'Maatvoering bijgewerkt'}</span><span>{dimensions.risers} optredes</span><span>{dimensions.treadCount} aantreden</span>{#if drawingView && !invalidGeometry}<span>Zoom {activeView === '3D-model' ? viewZoom : zoom}%</span>{/if}<span>Eenheden mm</span></div>{/if}
+      {#if activeView==='Trapontwerp'}<div class="canvas-status"><span><i></i>{well.instances.length} componenten</span><span>Schacht {well.length} × {well.width} mm</span><span>Verdiepingshoogte {well.storeyHeight} mm</span></div>{:else if !model.stairEnabled}<div class="canvas-status"><span><i></i>Leeg project</span><span>0 trappen</span></div>{:else}<div class="canvas-status"><span><i></i>{invalidGeometry ? 'Geometrie onvolledig' : activeView === '3D-model' ? 'Model actueel' : activeView === 'Onderdelen' ? 'Stukstaat bijgewerkt' : 'Maatvoering bijgewerkt'}</span><span>{dimensions.risers} optredes</span><span>{dimensions.treadCount} aantreden</span>{#if drawingView && !invalidGeometry}<span>Zoom {activeView === '3D-model' ? viewZoom : zoom}%</span>{/if}<span>Eenheden mm</span></div>{/if}
     </section>
 
     <BlueprintSplitter side="right" />
     <aside class="properties-panel oa-panel">
       <div class="panel-titlebar oa-panel-header"><span>{rightTab === 'Eigenschappen' ? 'Eigenschappen' : 'Controleren'}</span></div>
-      <div class="panel-subtabs"><button class:active={rightTab === 'Eigenschappen'} onclick={() => rightTab = 'Eigenschappen'}>Eigenschappen</button><button class:active={rightTab === 'Controleren'} onclick={() => rightTab = 'Controleren'}>Controleren <span class="panel-notice">{errors || '✓'}</span></button></div>
-      {#if activeView === 'Trapontwerp' && rightTab === 'Controleren'}
+      <div class="panel-subtabs"><button class:active={rightTab === 'Eigenschappen'} onclick={() => rightTab = 'Eigenschappen'}>Eigenschappen</button><button class:active={rightTab === 'Controleren'} onclick={() => rightTab = 'Controleren'}>Controleren <span class="panel-notice">{model.stairEnabled ? errors || '✓' : '0'}</span></button></div>
+      {#if !model.stairEnabled && activeView !== 'Trapontwerp'}
+        <div class="properties-content"><div class="selected-element"><span class="property-icon"><Icon name="file.new" size={18}/></span><div><span class="eyebrow">PROJECT · 0 TRAPPEN</span><b>{model.project.name}</b></div></div><div class="property-section"><h3>Projectgegevens</h3><label for="project-name">Projectnaam</label><input class="text-field" id="project-name" value={model.project.name} oninput={e => updateRoot('project','name',e.currentTarget.value)} /><label for="project-number">Projectnummer</label><input class="text-field" id="project-number" value={model.project.number} oninput={e => updateRoot('project','number',e.currentTarget.value)} /><label for="project-revision">Revisie</label><input class="text-field" id="project-revision" value={model.project.revision} oninput={e => updateRoot('project','revision',e.currentTarget.value)} /></div><div class="property-section"><h3>Trap toevoegen</h3><p>Kies links een traptype of gebruik de keuzelijst bovenaan.</p></div></div>
+      {:else if activeView === 'Trapontwerp' && rightTab === 'Controleren'}
         <div class="properties-content"><div class="property-section"><h3>Geometrie en coördinatie</h3>{#each assemblies as a}<h4>{a.instance.mark} · {typeOf(a.instance.type).label}</h4>{#each a.issues as i}<div class="check-row"><i class:check-red={i.level==='error'}>{i.level==='error'?'×':'i'}</i><div><small>{i.text}</small></div></div>{:else}<p>Geen bevindingen uit de componentcontroles.</p>{/each}
           {#if a.precast}<h4>Prefab deeltoetsen</h4>{#each a.precast.elements as e}<button class="action-btn" onclick={()=>inspectCast(a.instance.id,e.id)}>{e.label} · {e.status==='fail'?'Overschreden':'Open punten'}</button>{/each}{/if}
           {:else}<p>Voeg eerst een trappenhuiscomponent toe.</p>{/each}</div></div>
@@ -802,7 +814,7 @@
     </aside>
   </main>
 
-  <footer class="statusbar oa-statusbar"><div class="status-left"><span class="status-indicator"></span><span>{activeView==='Trapontwerp' ? 'Trapontwerp · '+(wellItem?.mark??model.project.number) : model.stair.mark+' · '+model.stair.name}</span><span class="status-dimensions">{activeView==='Trapontwerp'?well.length:model.stair.width} × {activeView==='Trapontwerp'?well.width:model.stair.floorHeight} mm</span><span class="status-muted">{activeView==='Trapontwerp'?'Coördinatiemodel':materialLabel}</span></div><div class="status-right"><span>{dirty ? 'Niet opgeslagen' : 'Concept'}</span><span class="status-separator"></span><span>{ruleProfiles.find(p => p.id === model.regulatory.profile)?.label}</span><span class="status-separator"></span><span>OSS {model.version}</span></div></footer>
+  <footer class="statusbar oa-statusbar"><div class="status-left"><span class="status-indicator"></span><span>{activeView==='Trapontwerp' ? 'Trapontwerp · '+(wellItem?.mark??model.project.number) : model.stairEnabled?model.stair.mark+' · '+model.stair.name:'Nog geen trap'}</span><span class="status-dimensions">{activeView==='Trapontwerp'?well.length+' × '+well.width+' mm':model.stairEnabled?model.stair.width+' × '+model.stair.floorHeight+' mm':'0 trappen'}</span><span class="status-muted">{activeView==='Trapontwerp'?'Coördinatiemodel':model.stairEnabled?materialLabel:'Kies een traptype'}</span></div><div class="status-right"><span>{dirty ? 'Niet opgeslagen' : 'Concept'}</span><span class="status-separator"></span><span>{ruleProfiles.find(p => p.id === model.regulatory.profile)?.label}</span><span class="status-separator"></span><span>OSS {model.version}</span></div></footer>
   {#if toast}<div class="toast">{toast}</div>{/if}
   <dialog bind:this={newProjectDialog} class="oa-dialog new-project-dialog" aria-labelledby="new-project-heading" aria-describedby="new-project-message">
     <h2 id="new-project-heading" class="oa-heading oa-heading--dialog">Nieuw project starten?</h2>

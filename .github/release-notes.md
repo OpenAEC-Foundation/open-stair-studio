@@ -2,6 +2,11 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.10
+
+- Nieuw project begint nu echt leeg: 0 trappen in de projectboom en geen automatisch 3D-trapmodel, onderdelen, werkbladen of trapexport.
+- Pas na de keuze van een traptype wordt een trap toegevoegd. Een leeg project kan worden opgeslagen, gesloten en opnieuw geopend zonder dat de standaardtrap terugkomt.
+
 ## Nieuw in 0.13.9
 
 - Nieuw project toont bij niet opgeslagen wijzigingen een duidelijke bevestiging in het appvenster. Annuleren bewaart het huidige project; bevestigen start een vers project en vervangt het automatisch herstelde concept.

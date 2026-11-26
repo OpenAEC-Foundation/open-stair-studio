@@ -85,7 +85,7 @@ function readField(section, key, value) {
 }
 
 export function readProject(raw) {
-  if (!isRecord(raw) || !isRecord(raw.project) || !isRecord(raw.stair)) throw new Error('Projectgegevens of trap ontbreken.');
+  if (!isRecord(raw) || !isRecord(raw.project) || (!isRecord(raw.stair) && !(raw.stairEnabled === false && raw.stair == null))) throw new Error('Projectgegevens of trap ontbreken.');
   if ((raw.app !== undefined && raw.app !== starterProject.app) || (raw.units !== undefined && raw.units !== 'mm')) {
     throw new Error('Open een Open Stair Studio-project met maten in millimeter.');
   }
@@ -96,10 +96,14 @@ export function readProject(raw) {
   if (raw.schema !== undefined && !supportedSchemas.includes(raw.schema)) {
     throw new Error('Onbekend projectformaat.');
   }
-  for (const key of ['type', 'floorHeight', 'width', 'going', 'risers']) {
+  if (isRecord(raw.stair)) for (const key of ['type', 'floorHeight', 'width', 'going', 'risers']) {
     if (!Object.hasOwn(raw.stair, key)) throw new Error(`Trapgegeven ontbreekt: ${labels[key] ?? 'Trapfamilie'}.`);
   }
   const model = { ...structuredClone(raw), ...structuredClone(starterProject) };
+  if (Object.hasOwn(raw, 'stairEnabled')) {
+    if (typeof raw.stairEnabled !== 'boolean') throw new Error('Ongeldige trapstatus.');
+    model.stairEnabled = raw.stairEnabled;
+  }
   if (Object.hasOwn(raw,'stairwell')) model.stairwell = readWell(raw.stairwell);
   if (Object.hasOwn(raw, 'status')) {
     if (typeof raw.status !== 'string') throw new Error('Ongeldige projectstatus.');
@@ -111,7 +115,7 @@ export function readProject(raw) {
   for (const key of Object.keys(model.building)) model.building[key] = null;
   for (const key of Object.keys(model.project)) model.project[key] = '';
   for (const section of sections) {
-    if (!Object.hasOwn(raw, section)) continue;
+    if (!Object.hasOwn(raw, section) || (section === 'stair' && raw.stairEnabled === false && raw.stair == null)) continue;
     if (!isRecord(raw[section])) throw new Error(`Ongeldige projectsectie: ${section}.`);
     const defaults = model[section];
     model[section] = { ...structuredClone(raw[section]), ...defaults };
@@ -144,8 +148,9 @@ export function startSession(model, saved = true) {
 }
 
 export function editSession(session, section, key, value) {
-  if (Object.is(session.model[section][key], value)) return session;
+  if (Object.is(session.model[section][key], value) && !(section === 'stair' && key === 'type' && !session.model.stairEnabled)) return session;
   const model = { ...session.model, [section]: { ...session.model[section], [key]: value } };
+  if (section === 'stair' && key === 'type') model.stairEnabled = true;
   if(section==='stair'&&key==='type'&&['quarter_winder','half_winder'].includes(value)){
     model.stair.stringerLeft='housed';model.stair.stringerRight='housed';
   }
