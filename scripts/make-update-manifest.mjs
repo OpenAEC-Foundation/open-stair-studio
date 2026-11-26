@@ -7,7 +7,8 @@ if(!destination||!tag||!name||!signaturePath||!/^v\d+\.\d+\.\d+$/.test(tag)||
   throw new Error('Release tag, installer or signature path is invalid.');
 const signature=readFileSync(signaturePath,'utf8').trim();
 if(!signature)throw new Error('Empty updater signature.');
-const encoded=encodeURIComponent(name);
+// GitHub Release assets replace spaces in uploaded filenames with dots.
+const encoded=encodeURIComponent(name.replaceAll(' ','.'));
 const manifest={version:tag.slice(1),notes:'Open Stair Studio update',
   platforms:{'windows-x86_64':{
     url:`https://github.com/OpenAEC-Foundation/open-stair-studio/releases/download/${tag}/${encoded}`,
