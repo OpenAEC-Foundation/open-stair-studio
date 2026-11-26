@@ -102,7 +102,7 @@ export function timberViews(row, stationIndex = 0) {
     if (row.type==='nosingStrip') return [top,diagram('Wellat · dwarsdoorsnede',[line(p.profileContour)],'Gemeten loodrecht op de lengteas van de wellat.')];
     const t=p.stockThicknessMm,h=p.stockWidthMm;
     return [top,diagram('Stootbord · dwarsdoorsnede',[line(p.profileContour??[point(0,0),point(t,0),point(t,h),point(0,h)])],
-      p.profileContour?'Onder- en bovenaansluiting in de looprichting. Verticale maat is de vrije hoogte; de ruwplank volgt de schuine ontwikkelde lengte.':
+      p.profileContour?(p.developedHeightMm>p.heightMm+1e-6?'Afwijkend schuin stootbord: doorsnede en ruwplank volgen de ontwikkelde lengte.':'Verticaal stootbord: rechte doorsnede en ruwplank volgens de vrije hoogte.'):
         'Verticale richting geeft de plankhoogte. Horizontale richting geeft de dikte.')];
   }
   return uprightViews(row.part, stationIndex);

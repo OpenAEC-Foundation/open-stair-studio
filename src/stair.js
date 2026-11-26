@@ -33,7 +33,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.10',
+  version: '0.13.11',
   stairEnabled: true,
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
@@ -223,12 +223,15 @@ export function generateStairGeometry(stair, options) {
   };
   const firstFlight = dimensions.flights[0];
   const firstEnd = Math.max(0, firstFlight.risers - 1) * going;
+  const nose = Number(stair.nosing) || 0;
+  const landingEntry = Math.min(firstEnd, firstEnd - nose);
+  const outgoingAllowance = Math.max(0,(Number(stair.riserThickness) || 0)-nose);
   if (stair.type === 'quarter_turn') {
-    addLanding(`${stair.mark}-LB-01`, rectPoints(firstEnd, -width / 2, firstEnd + width, landingLength - width / 2), firstFlight.risers);
+    addLanding(`${stair.mark}-LB-01`, rectPoints(landingEntry, -width / 2, firstEnd + width, landingLength - width / 2 + outgoingAllowance), firstFlight.risers);
   } else if (stair.type === 'landing') {
-    addLanding(`${stair.mark}-LB-01`, rectPoints(firstEnd, -width / 2, firstEnd + landingLength, width / 2), firstFlight.risers);
+    addLanding(`${stair.mark}-LB-01`, rectPoints(landingEntry, -width / 2, firstEnd + landingLength + outgoingAllowance, width / 2), firstFlight.risers);
   } else if (stair.type === 'half_turn') {
-    addLanding(`${stair.mark}-LB-01`, rectPoints(firstEnd, -width / 2, firstEnd + landingLength, width + laneGap + width / 2), firstFlight.risers);
+    addLanding(`${stair.mark}-LB-01`, rectPoints(Math.min(landingEntry,firstEnd+nose-(Number(stair.riserThickness)||0)), -width / 2, firstEnd + landingLength, width + laneGap + width / 2), firstFlight.risers);
   }
   const frameAssemblies=landings.map(landing=>buildLandingFrame(landing,stair));
   const landingFrame=frameAssemblies.flatMap(frame=>frame.members);

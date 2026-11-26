@@ -8,10 +8,6 @@ export function treadClearanceIssue(stair, d, system='timber') {
     return { title:'Geen ruimte voor gesloten stootborden',
       detail:`De optrede is ${mm(d.rise)} en de trede is ${mm(stair.treadThickness)} dik. De vrije stootbordhoogte is ${mm(free)}. Verlaag de trededikte of vergroot de optrede.` };
   }
-  if (free<0 && stair.nosing>0 && d.treadCount>1) {
-    return { title:'Overlappende treden',
-      detail:`Bij het neusoverstek van ${mm(stair.nosing)} overlappen opeenvolgende tredecontouren verticaal met ${mm(-free)}. Verklein de trededikte, vergroot de optrede of pas het neusoverstek aan.` };
-  }
   return null;
 }
 
@@ -52,6 +48,8 @@ export function geometryErrors(stair, d, system='timber') {
   if (d.flightCount > 1 && Number(stair.landingLength) < Number(stair.width)) {
     add('Bordeslengte te klein voor deze trapfamilie', 'Voor dit model moet de bordeslengte minstens gelijk zijn aan de buitenwerkse trapbreedte.');
   }
+  if (system==='timber' && stair.riserBoards==='closed' && d.flightCount>1 && Number(stair.landingThickness)>=d.rise)
+    add('Geen ruimte voor stootbord onder bordes','De bordesdikte moet kleiner zijn dan de optrede zodat het stootbord op de onderzijde van het bordes kan aansluiten.');
   if(d.flightCount>1 && stair.landingRiser && (stair.landingRiser<2 || stair.landingRiser>stair.risers-2)){
     add('Bordespeil buiten vluchtbereik','Kies minstens twee optredes onder en boven het bordes.');
   }

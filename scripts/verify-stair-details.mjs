@@ -90,10 +90,36 @@ for(const nose of [-25,0,25]){
   const station=p=>(p.x-tread.frontEdge[0].x)*tread.direction.x+(p.y-tread.frontEdge[0].y)*tread.direction.y;
   const top=board.faces.flat().filter(p=>Math.abs(p.z-(tread.elevation-tread.thickness))<1e-6);
   const bottom=board.faces.flat().filter(p=>Math.abs(p.z-(tread.elevation-geometry.dimensions.rise))<1e-6);
-  near(Math.min(...top.map(station)),Math.max(0,nose-stair.riserThickness));
-  near(Math.max(...bottom.map(station)),0);
+  near(Math.min(...top.map(station)),0);
+  near(Math.max(...bottom.map(station)),stair.riserThickness);
+  near(Math.min(...top.map(station)),Math.min(...bottom.map(station)));
+  near(Math.max(...top.map(station)),Math.max(...bottom.map(station)));
   const model={...structuredClone(starterProject),stair};
   assert(createIfc4WithApi(api,model,geometry).bytes.length>0);
+}
+for(const type of ['quarter_turn','half_turn','landing'])
+for(const turnDirection of ['left','right'])
+for(const nose of [-25,0,25]) {
+  const {stair,geometry,parts}=shape(type,{railSide:'none',turnDirection,nosing:nose});
+  const landing=geometry.landings[0],lower=parts.find(p=>p.id===`${stair.mark}-V1-UIT-SB`);
+  const upperTread=geometry.treads.find(t=>t.flightIndex===1);
+  const upper=parts.find(p=>p.id===upperTread.id+'-SB');
+  const bounds={minX:Math.min(...landing.points.map(p=>p.x)),maxX:Math.max(...landing.points.map(p=>p.x)),
+    minY:Math.min(...landing.points.map(p=>p.y)),maxY:Math.max(...landing.points.map(p=>p.y))};
+  const inLanding=p=>p.x>=bounds.minX-1e-6&&p.x<=bounds.maxX+1e-6&&p.y>=bounds.minY-1e-6&&p.y<=bounds.maxY+1e-6;
+  assert(lower&&upper,`${type} ${turnDirection} ${nose}: beide bordesstootborden`);
+  const lowerTop=lower.faces.flat().filter(p=>Math.abs(p.z-(landing.elevation-landing.thickness))<1e-6);
+  const upperBottom=upper.faces.flat().filter(p=>Math.abs(p.z-landing.elevation)<1e-6);
+  assert(lowerTop.length&&upperBottom.length);
+  assert(lowerTop.every(inLanding),`${type} ${turnDirection} ${nose}: aansluiting onder bordes`);
+  assert(upperBottom.every(inLanding),`${type} ${turnDirection} ${nose}: aansluiting boven bordes`);
+  near(lower.volumeM3,volume(lower.faces)/1e9);
+  near(upper.volumeM3,volume(upper.faces)/1e9);
+}
+{
+  const stair={...starterProject.stair,...newDesignDetails,type:'quarter_turn',landingThickness:180};
+  const model={...structuredClone(starterProject),stair};
+  assert(inspectStair(model).some(f=>f.title==='Geen ruimte voor stootbord onder bordes'));
 }
 {
   const {stair,geometry,parts}=shape('straight',{railSide:'none',nosing:-25,riserPosition:'manual',riserTopInset:12,riserBottomInset:25});
@@ -123,7 +149,7 @@ for(const nose of [-25,0,25]){
   for(const [riserBoards,nosing,thickness,message] of [
     ['closed',25,45,'vrije stootbordhoogte is -5 mm'],
     ['closed',0,40,'vrije stootbordhoogte is 0 mm'],
-    ['none',25,45,'overlappen opeenvolgende tredecontouren'],
+    ['none',25,45,null],
     ['none',25,40,null],['none',0,45,null],['closed',25,39,null]
   ]) {
     Object.assign(stair,{riserBoards,nosing,treadThickness:thickness});

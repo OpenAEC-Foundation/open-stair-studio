@@ -15,23 +15,26 @@ function verifyLanding(stair, model) {
   const firstEnd = first.origin.x + first.treadCount * stair.going;
   const [xmin, xmax] = bounds(landing.points, 'x');
   const [ymin, ymax] = bounds(landing.points, 'y');
-  near(xmin, firstEnd, 'incoming flight ends at landing edge');
+  assert.ok(xmin <= firstEnd - stair.nosing + 1e-7, 'landing covers the incoming tread back');
   near(ymin, -stair.width / 2, 'incoming flight fits over full width');
   assert.ok(ymax >= stair.width / 2);
   near(landing.elevation, first.risers * model.dimensions.rise, 'landing level');
   const nextTread = model.treads.find(board => board.flightIndex === 1);
   near(nextTread.elevation - landing.elevation, model.dimensions.rise, 'departure rise');
   if (stair.type === 'quarter_turn') {
-    near(second.origin.y, ymax, 'quarter-turn departure edge');
-    near(second.origin.x, (xmin + xmax) / 2, 'quarter-turn centring');
-    near(xmax - xmin, stair.width, 'quarter-turn departure width');
+    assert.ok(second.origin.y - stair.nosing + stair.riserThickness <= ymax + 1e-7,
+      'quarter-turn landing supports the outgoing riser');
+    assert.ok(second.origin.x - stair.width/2 >= xmin - 1e-7 && second.origin.x + stair.width/2 <= xmax + 1e-7,
+      'quarter-turn departure width lies on landing');
   } else if (stair.type === 'half_turn') {
-    near(second.origin.x, xmin, 'return flight departure edge');
+    assert.ok(second.origin.x + stair.nosing - stair.riserThickness >= xmin - 1e-7,
+      'return landing supports the outgoing riser');
     near(second.origin.y, ymax - stair.width / 2, 'return flight centring');
-    near(xmax - xmin, stair.landingLength, 'return landing depth');
+    assert.ok(xmax - xmin >= stair.landingLength, 'return landing depth');
     near(ymax - ymin, 2 * stair.width + stair.laneGap, 'return landing width');
   } else {
-    near(second.origin.x, xmax, 'straight landing departure edge');
+    assert.ok(second.origin.x - stair.nosing + stair.riserThickness <= xmax + 1e-7,
+      'straight landing supports the outgoing riser');
     near(second.origin.y, (ymin + ymax) / 2, 'straight landing centring');
   }
 }

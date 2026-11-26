@@ -46,10 +46,11 @@
     {#if !['quarter_winder','half_winder'].includes(stair.type)}
       <label for="stair-riser-position">Aansluiting stootbord</label>
       <select id="stair-riser-position" value={stair.riserPosition??'auto'} onchange={e=>update('riserPosition',e.currentTarget.value)}>
-        <option value="auto">Automatisch · sluit tussen de treden</option><option value="manual">Boven- en onderzijde instellen</option>
+        <option value="auto">Verticaal · standaard aansluiting</option><option value="manual">Schuin · afwijkend maatwerk</option>
       </select>
     {/if}
     {#if stair.riserPosition==='manual' && !['quarter_winder','half_winder'].includes(stair.type)}
+      <small>Deze afwijkende stand maakt het stootbord bewust schuin. Kies ‘Verticaal’ voor een recht stootbord.</small>
       <label for="stair-riser-top">Bovenzijde achter tredevoorzijde (mm)</label>
       <input id="stair-riser-top" class="text-field" type="number" min="0" max="80" value={stair.riserTopInset} onchange={e=>update('riserTopInset',e.currentTarget)} />
       <label for="stair-riser-bottom">Onderzijde vóór achterrand ondertrede (mm)</label>

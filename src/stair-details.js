@@ -181,23 +181,12 @@ function riserParts(stair,geometry) {
     parts.push({id,label:'Houten stootbord',kind:'plate',material:'timber',heightMm:top-bottom,...riserStock(points,direction,top-bottom,stair.riserThickness),
       thicknessMm:stair.riserThickness,volumeM3:planArea*(top-bottom)/1e9,faces:prism(points,bottom,top)});
   };
-  // A recessed tread starts beyond the back of the tread below it. Connect
-  // those two real edges with a sheared panel instead of leaving a slit.
+  // Standard boards stand vertically against the lower tread back and below
+  // the next tread. The optional manual profile remains an explicit sloped detail.
   const addStraight=(t,flight)=>{
     const height=rise-t.thickness,thickness=stair.riserThickness;
     if(height<=0) return;
     const nose=Number(stair.nosing)||0;
-    const topInset=stair.riserPosition==='manual'?Number(stair.riserTopInset):Math.max(0,nose-thickness);
-    const bottomInset=stair.riserPosition==='manual'?Number(stair.riserBottomInset):thickness;
-    const topX=topInset,heightRatio=height>0?1/height:0;
-    let horizontalThickness=thickness,bottomX=-bottomInset;
-    if(stair.riserPosition!=='manual'){
-      for(let i=0;i<12;i++){
-        bottomX=-horizontalThickness;
-        horizontalThickness=thickness*Math.hypot(1,(topX-bottomX)*heightRatio);
-      }
-      bottomX=-horizontalThickness;
-    } else horizontalThickness=thickness*Math.hypot(1,(topX-bottomX)*heightRatio);
     const d=t.direction,normal={x:-d.y,y:d.x};
     const frontRun=(t.step-1)*Number(stair.going)-nose,halfClear=Number(stair.width)/2-Number(stair.stringerThickness);
     const centre={x:flight.origin.x+d.x*frontRun,y:flight.origin.y+d.y*frontRun};
@@ -205,6 +194,19 @@ function riserParts(stair,geometry) {
     const b={x:centre.x+normal.x*halfClear,y:centre.y+normal.y*halfClear};
     const at=(side,x,z)=>({x:(side?b.x:a.x)+d.x*x,y:(side?b.y:a.y)+d.y*x,z});
     const bottom=t.elevation-rise,top=t.elevation-t.thickness;
+    if(stair.riserPosition!=='manual'){
+      const points=[at(0,0,0),at(0,thickness,0),at(1,thickness,0),at(1,0,0)];
+      const profileContour=[{x:0,y:0},{x:thickness,y:0},{x:thickness,y:height},{x:0,y:height}];
+      const width=Math.hypot(b.x-a.x,b.y-a.y);
+      parts.push({id:t.id+'-SB',label:'Houten stootbord',kind:'plate',role:'riser',material:'timber',
+        heightMm:height,developedHeightMm:height,topInsetMm:0,bottomInsetMm:thickness,
+        profileContour,...riserStock(points,d,height,thickness),thicknessMm:thickness,
+        volumeM3:width*height*thickness/1e9,faces:prism(points,bottom,top)});
+      return;
+    }
+    const topInset=Number(stair.riserTopInset),bottomInset=Number(stair.riserBottomInset);
+    const topX=topInset,bottomX=-bottomInset;
+    const horizontalThickness=thickness*Math.hypot(1,(topX-bottomX)/height);
     const vertices=[at(0,bottomX,bottom),at(0,bottomX+horizontalThickness,bottom),at(0,topX+horizontalThickness,top),at(0,topX,top),
       at(1,bottomX,bottom),at(1,bottomX+horizontalThickness,bottom),at(1,topX+horizontalThickness,top),at(1,topX,top)];
     const faces=[[0,3,2,1],[4,5,6,7],[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7]]
@@ -236,7 +238,8 @@ function riserParts(stair,geometry) {
     }
     const last=treads.at(-1);
     if (!last) continue;
-    const endZ=last.elevation+rise;
+    const landing=geometry.landings.find(item=>item.level===last.level+1);
+    const endZ=landing?landing.elevation-landing.thickness:last.elevation+rise;
     let ref,direction=last.direction;
     if(geometry.dimensions.family.winder) {
       const terminals=[1,-1].map(side=>geometry.stringers.filter(b=>b.side===side).at(-1)?.vertices?.[1]);
@@ -250,7 +253,15 @@ function riserParts(stair,geometry) {
       ref={x:flight.origin.x+flight.direction.x*end,
         y:flight.origin.y+flight.direction.y*end};
     }
-    const footprint=strip(last.points,ref,direction,-stair.riserThickness,0);
+    let footprint;
+    if(geometry.dimensions.family.winder) footprint=strip(last.points,ref,direction,-stair.riserThickness,0);
+    else {
+      const normal={x:-direction.y,y:direction.x};
+      const half=Number(stair.width)/2-Number(stair.stringerThickness),thickness=Number(stair.riserThickness);
+      const point=(side,along)=>({x:ref.x+normal.x*side*half+direction.x*along,
+        y:ref.y+normal.y*side*half+direction.y*along});
+      footprint=[point(-1,0),point(-1,thickness),point(1,thickness),point(1,0)];
+    }
     add(`${stair.mark}-V${flight.index+1}-UIT-SB`,footprint,last.elevation,endZ,direction);
   }
   return parts;

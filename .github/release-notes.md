@@ -2,6 +2,12 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.11
+
+- Het standaard houten stootbord staat nu verticaal tegen de achterzijde van de lagere trede en onder de volgende trede. Een schuine uitvoering blijft alleen als expliciet maatwerk beschikbaar.
+- Bij een kwartslag, halfslag of rechte bordestrap eindigt het stootbord van de eerste vlucht aan de onderzijde van het bordes. De bordesplaat omvat de aansluiting van beide vluchten, ook bij een verplaatste tredevoorzijde en links- of rechtsdraaiende trappen.
+- Werkplaatstekeningen, bruto houtmaat, calculatie en IFC4 gebruiken de aangepaste verticale onderdelen en bordesmaat. De controle wijst een te dik bordes voor een gesloten stootbord af.
+
 ## Nieuw in 0.13.10
 
 - Nieuw project begint nu echt leeg: 0 trappen in de projectboom en geen automatisch 3D-trapmodel, onderdelen, werkbladen of trapexport.
