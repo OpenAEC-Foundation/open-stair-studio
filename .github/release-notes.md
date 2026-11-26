@@ -2,7 +2,13 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
-## Nieuw in 0.13.3
+## Nieuw in 0.13.4
+
+- De tredevoorzijde kan nu vóór of achter de keep liggen: een negatieve neusmaat geeft een terugliggende neus.
+- Ook de zijrand kan met een negatieve maat binnen de keepboom liggen. De tool controleert de resterende oplegbreedte.
+- De aangepaste tredevorm werkt door in 3D, materiaalhoeveelheden, trede-CNC en IFC4.
+
+## Eerder toegevoegd in 0.13.3
 
 - Kies bij steektrappen en trappen met bordes per zijde tussen een ingekroosde boom en een uitgezaagde keepboom.
 - Keepbomen hebben horizontale tredeopleggingen, een instelbare minimale houtstrook en een instelbaar tredeoverstek. Hun netto- en ruwvolume tellen mee in de calculatie.

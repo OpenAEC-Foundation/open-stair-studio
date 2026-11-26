@@ -34,6 +34,11 @@ export function geometryErrors(stair, d, system='timber') {
   if (Number(stair.width) <= 2 * Number(stair.stringerThickness)) {
     add('Geen ruimte voor de treden', 'De buitenwerkse breedte moet groter zijn dan de som van beide trapboomdiktes.');
   }
+  if (Number(stair.going)+Number(stair.nosing)<50)
+    add('Trede te kort','De terugliggende neus laat minder dan 50 mm tredevlak over. Verklein de terugligging of vergroot de aantrede.');
+  if((stair.stringerLeft==='cut'||stair.stringerRight==='cut') &&
+    Number(stair.stringerThickness)+Number(stair.stringerOverhang)<10)
+    add('Trede mist keepboom','De trederand ligt te ver binnen de boom: er blijft minder dan 10 mm oplegvlak op de keep over.');
   if(isWinder(stair.type)&&(stair.stringerLeft==='cut'||stair.stringerRight==='cut'))
     add('Keepboom bij verdreven treden','De keepverdeling van een verdreven trede vraagt een afzonderlijke raildoorsnede. Kies voor deze trap twee ingekroosde segmentbomen.');
   if (d.flightCount > 1 && Number(stair.landingLength) < Number(stair.width)) {

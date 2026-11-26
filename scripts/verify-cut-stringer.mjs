@@ -6,6 +6,7 @@ import {writeCutStringerDxf} from '../src/cut-stringer.js';
 import {readProject,editSession,startSession} from '../src/project.js';
 import {geometryErrors} from '../src/stair-validity.js';
 import {createIfc4WithApi} from '../src/ifc-export-core.js';
+import {compileTreadJob,defaultTreadCam,writeTreadLinuxCnc} from '../src/tread-cam.js';
 
 const triple=(a,b,c)=>a.x*(b.y*c.z-b.z*c.y)+a.y*(b.z*c.x-b.x*c.z)+a.z*(b.x*c.y-b.y*c.x);
 const api=new IFC.IfcAPI();
@@ -50,4 +51,27 @@ invalid.stair.type='quarter_winder';invalid.stair.stringerLeft='cut';
 assert(geometryErrors(invalid.stair,generateStairGeometry(invalid.stair).dimensions).some(item=>item.title==='Keepboom bij verdreven treden'));
 const switched=editSession(startSession(invalid),'stair','type','half_winder');
 assert.equal(switched.model.stair.stringerLeft,'housed');
-console.log(`Keepbomen: ${checked} vlakke trapvarianten, 3D-solid, volume, huizen, DXF en IFC4 gecontroleerd.`);
+for(const type of ['straight','quarter_turn','landing','half_turn']){
+  const model=structuredClone(starterProject);
+  Object.assign(model.stair,{type,stringerLeft:'cut',stringerRight:'cut',nosing:-25,stringerOverhang:-20});
+  const geometry=generateStairGeometry(model.stair);
+  assert.equal(geometryErrors(model.stair,geometry.dimensions).length,0,type);
+  assert.equal(geometry.treads[0].length,model.stair.going-25);
+  assert.equal(geometry.treads[0].width,model.stair.width-40);
+  const flight=geometry.flights[0],tread=geometry.treads[0];
+  const front=tread.points[0],along=(front.x-flight.origin.x)*flight.direction.x+(front.y-flight.origin.y)*flight.direction.y;
+  assert(Math.abs(along-25)<1e-7,`${type} terugliggende neus`);
+  const workshop=buildWorkshop(geometry,model);
+  assert.equal(workshop.housings.issues.length,0,type);
+  const treadPart=workshop.parts.find(part=>part.kind==='tread');
+  const job=compileTreadJob(treadPart,defaultTreadCam);
+  assert(writeTreadLinuxCnc(job).includes('G21 G17 G90'));
+  assert.equal(readProject(model).stair.nosing,-25);
+  assert(createIfc4WithApi(api,model,geometry).bytes.length>1000);
+}
+const unsupported=structuredClone(starterProject);
+unsupported.stair.stringerLeft='cut';unsupported.stair.stringerOverhang=-unsupported.stair.stringerThickness;
+assert(geometryErrors(unsupported.stair,generateStairGeometry(unsupported.stair).dimensions).some(item=>item.title==='Trede mist keepboom'));
+const reversed=editSession(startSession({...starterProject,stair:{...starterProject.stair,nosing:-25}}),'stair','type','quarter_winder');
+assert.equal(reversed.model.stair.nosing,0);
+console.log(`Keepbomen: ${checked} vlakke trapvarianten plus vier terugliggende neus- en trederanden, 3D-solid, volume, huizen, DXF en IFC4 gecontroleerd.`);

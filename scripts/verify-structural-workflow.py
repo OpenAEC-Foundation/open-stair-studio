@@ -77,7 +77,7 @@ def check(page, download):
     assert data.count(b'=IFCGROUP(') > 100 and b'OSS_ConstructieveToets_' in data
     saved = download('Opslaan','.oss.json')
     model = json.loads(saved.read_text(encoding='utf-8-sig'))
-    assert model['version'] == '0.13.3' and model['stairwell']['instances'][0]['params']['designP'] == 2
+    assert model['version'] == '0.13.4' and model['stairwell']['instances'][0]['params']['designP'] == 2
     upload.set_input_files(saved)
     tab('Engineering').click()
     assert 'VT-01' in calc.inner_text()

@@ -15,7 +15,12 @@ with sync_playwright() as playwright:
     page.locator('#family').select_option('quarter_turn')
     page.locator('#stringer-left').select_option('cut')
     assert page.locator('#stringer-right').input_value()=='housed'
-    assert page.locator('#stringer-overhang').input_value()=='20'
+    page.locator('#stringer-overhang').fill('-20')
+    page.locator('#stringer-overhang').press('Tab')
+    page.locator('#nosing').fill('-25')
+    page.locator('#nosing').press('Tab')
+    assert page.locator('#stringer-overhang').input_value()=='-20'
+    assert page.locator('#nosing').input_value()=='-25'
     if len(sys.argv)>2:
         page.locator('canvas[aria-label="3D-model van de trap"]').wait_for(timeout=30000)
         page.get_by_text('3D-weergave laden…').wait_for(state='hidden',timeout=30000)
@@ -39,4 +44,4 @@ with sync_playwright() as playwright:
     assert page.get_by_role('button',name='Volledige wang-DXF').is_enabled()
     assert not errors,errors
     browser.close()
-print('UI: keepboom per zijde, werkblad, gesloten DXF en CNC-grens gecontroleerd.')
+print('UI: terugliggende neus en trederand, werkblad, gesloten DXF en CNC-grens gecontroleerd.')

@@ -33,7 +33,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.3',
+  version: '0.13.4',
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
   engineering: { ...defaultEngineering },
@@ -143,7 +143,7 @@ export function generateStairGeometry(stair, options) {
   const thickness = Math.max(10, Number(stair.treadThickness) || 40);
   const stringerThickness = Math.max(20, Number(stair.stringerThickness) || 50);
   const cutLeft=stair.stringerLeft==='cut', cutRight=stair.stringerRight==='cut';
-  const overhang=Math.max(0,Number(stair.stringerOverhang)||0);
+  const overhang=Number(stair.stringerOverhang)||0;
   const leftEdge=cutLeft?width/2+overhang:width/2-stringerThickness;
   const rightEdge=cutRight?-width/2-overhang:-width/2+stringerThickness;
   const treadWidth=Math.max(1,leftEdge-rightEdge);
@@ -155,7 +155,7 @@ export function generateStairGeometry(stair, options) {
   for (const flight of dimensions.flights) {
     const normal = { x: -flight.direction.y, y: flight.direction.x };
     for (let step = 0; step < flight.treadCount; step++) {
-      const nose = Math.max(0, Number(stair.nosing) || 0);
+      const nose = Number(stair.nosing) || 0;
       const physicalRun = going + nose;
       const center = add(add(flight.origin, scale(flight.direction, (step + 0.5) * going - nose / 2)),scale(normal,treadOffset));
       const halfRun = scale(flight.direction, physicalRun / 2);
@@ -171,8 +171,8 @@ export function generateStairGeometry(stair, options) {
         flightIndex: flight.index, step: step + 1, level, elevation: level * dimensions.rise,
         frontEdge: [corners[0], corners[3]], area: physicalRun * treadWidth,
         goingAtWalkline: going, depthAtWalkline: physicalRun, narrowDepth: physicalRun,
-        length: going + Math.max(0, Number(stair.nosing) || 0), width: treadWidth, thickness,
-        volume: ((going + Math.max(0, Number(stair.nosing) || 0)) * treadWidth * thickness) / 1e9,
+        length: physicalRun, width: treadWidth, thickness,
+        volume: (physicalRun * treadWidth * thickness) / 1e9,
         points: corners, svgPoints: pointString(corners), center, direction: flight.direction });
     }
     const entry = flight.index > 0 ? 1 : 0;
@@ -238,7 +238,7 @@ export function generateStairGeometry(stair, options) {
 
   const parts = [
     { id: `${stair.mark}-TD`, name: 'Trede · rechthoekig', quantity: treads.length,
-      length: going + Math.max(0, Number(stair.nosing) || 0), width: treadWidth, thickness,
+      length: going + (Number(stair.nosing) || 0), width: treadWidth, thickness,
       volume: treads.reduce((sum, tread) => sum + tread.volume, 0) },
     ...landings.map(landing => ({ id: landing.id, name: 'Bordesplaat · referentiemaat', quantity: 1,
       length: landing.length, width: landing.width, thickness: landing.thickness, volume: landing.volume })),

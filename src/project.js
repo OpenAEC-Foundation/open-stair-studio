@@ -17,12 +17,12 @@ const ranges = {
   originX: [-1000000000, 1000000000], originY: [-1000000000, 1000000000], originZ: [-1000000000, 1000000000],
   originRotationDeg: [-360, 360],
   windersPerQuarter: [2, 8], entrySteps: [-1, 39],
-  landingLength: [300, 5000], landingRiser: [0, 39], landingThickness: [20, 300], stringerThickness: [20, 150], stringerDepth: [100, 1000], stringerOverhang:[0,60],
+  landingLength: [300, 5000], landingRiser: [0, 39], landingThickness: [20, 300], stringerThickness: [20, 150], stringerDepth: [100, 1000], stringerOverhang:[-60,60],
   landingFrameWidth: [40, 150], landingFrameDepth: [80, 300],
   landingScrewsPerJoint: [0, 4], landingScrewDiameter: [5, 12], landingScrewLength: [40, 250],
   landingScrewShearRd: [0, 1000], fastenerUnitPrice: [0, 1000],
   landingTimberE: [0, 30000], landingTimberFmRd: [0, 100], landingDeflectionRatio: [100, 1000],
-  nosing: [0, 100], treadThickness: [10], wasteFactor: [1, 3], marginPercent: [0, 99]
+  nosing: [-60, 100], treadThickness: [10], wasteFactor: [1, 3], marginPercent: [0, 99]
 };
 const labels = {
   ...Object.fromEntries(timberDimensions.map(f=>[f.key,f.label])), noseSize:'Profielmaat tredeneus',
@@ -31,12 +31,12 @@ const labels = {
   originX: 'Projectnulpunt X', originY: 'Projectnulpunt Y', originZ: 'Projectnulpunt Z',
   originRotationDeg: 'Rotatie projectassen',
   windersPerQuarter: 'Treden per kwartslag', entrySteps: 'Treden vóór de boog',
-  landingLength: 'Bordeslengte', landingRiser:'Optrede op bordes', landingThickness: 'Bordesdikte', stringerThickness: 'Wangdikte', stringerDepth: 'Wanghoogte', stringerOverhang:'Overstek buiten keepboom',
+  landingLength: 'Bordeslengte', landingRiser:'Optrede op bordes', landingThickness: 'Bordesdikte', stringerThickness: 'Wangdikte', stringerDepth: 'Wanghoogte', stringerOverhang:'Trederand t.o.v. keepboom',
   landingFrameWidth: 'Bordesliggerbreedte', landingFrameDepth: 'Bordesliggerhoogte',
   landingScrewsPerJoint: 'Schroeven per stuiknaad', landingScrewDiameter: 'Schroefdiameter', landingScrewLength: 'Schroeflengte',
   landingScrewShearRd: 'Opgegeven schuifweerstand schroef', fastenerUnitPrice: 'Schroefprijs',
   landingTimberE: 'Elasticiteitsmodulus randligger', landingTimberFmRd: 'Buigsterkte randligger', landingDeflectionRatio: 'Doorbuigingscriterium',
-  nosing: 'Neusoverstek', treadThickness: 'Trededikte', laneGap: 'Tussenruimte',
+  nosing: 'Neuspositie t.o.v. keep', treadThickness: 'Trededikte', laneGap: 'Tussenruimte',
   wasteFactor: 'Zaag-/uitvalfactor', marginPercent: 'Brutomarge', laborRate: 'Uurtarief',
   overheadPercent: 'Opslag', laborHours: 'Werkuren', timberPricePerM3: 'Houtprijs',
   headroom: 'Gemeten vrije hoogte', openingWidth: 'Trapgatbreedte', openingLength: 'Trapgatlengte',
@@ -146,6 +146,7 @@ export function editSession(session, section, key, value) {
   const model = { ...session.model, [section]: { ...session.model[section], [key]: value } };
   if(section==='stair'&&key==='type'&&['quarter_winder','half_winder'].includes(value)){
     model.stair.stringerLeft='housed';model.stair.stringerRight='housed';
+    model.stair.nosing=Math.max(0,model.stair.nosing);
   }
   // Surveyed widths refer to a particular stair layout. Undo restores both
   // the geometry and the measurements for that layout together.
