@@ -1,0 +1,9 @@
+OpenAEC Blueprint 2026.45.0 · ontwerp 0.4
+OpenAEC Foundation
+https://github.com/OpenAEC-Foundation/OpenAEC-Blueprint/tree/2eb8a958bbfe864dea81237e8890cf2405620b7d/web
+
+openaec-components.css en openaec-tokens.css zijn ongewijzigde bestanden uit het webpakket.
+De Blueprint-licentie staat in BLUEPRINT-LICENSE.txt (CC BY-SA 4.0).
+frame.svg is het oorspronkelijke B2-spritebestand uit web/icons. De licentie van
+openaec-icons staat in ICONS-LICENSE.txt (LGPL-3.0-only). De lettertypen
+hebben eigen SIL Open Font Licenses in de map fonts van de applicatie.

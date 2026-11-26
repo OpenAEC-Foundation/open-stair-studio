@@ -1,0 +1,74 @@
+{
+  "schema": "https://openaec.foundation/schemas/open-stair-studio/project-0.4.json",
+  "app": "Open Stair Studio",
+  "version": "0.4.0",
+  "project": {
+    "name": "Werkplaatsvoorbeeld · halfslag",
+    "number": "OSS-WG-01",
+    "revision": "A",
+    "client": "",
+    "location": ""
+  },
+  "regulatory": {
+    "profile": "NL_NEW_HOME",
+    "construction": "new",
+    "occupancy": "residential",
+    "egressOnly": false,
+    "headroom": null
+  },
+  "building": {
+    "openingWidth": 1200,
+    "openingLength": 4600,
+    "upperLandingWidth": 900,
+    "upperLandingDepth": 900
+  },
+  "estimate": {
+    "timberPricePerM3": 2400,
+    "laborHours": 14,
+    "laborRate": 62,
+    "wasteFactor": 1.18,
+    "overheadPercent": 12,
+    "marginPercent": 20
+  },
+  "stair": {
+    "mark": "TR-01",
+    "name": "Rechtsdraaiende halfslag",
+    "type": "half_winder",
+    "material": "Eiken · massief",
+    "floorHeight": 2880,
+    "width": 900,
+    "going": 250,
+    "risers": 18,
+    "nosing": 25,
+    "landingLength": 1000,
+    "laneGap": 100,
+    "treadThickness": 40,
+    "windersPerQuarter": 4,
+    "turnDirection": "right",
+    "entrySteps": 3,
+    "outerShape": "square",
+    "stringerDepth": 280,
+    "stringerThickness": 50,
+    "stringer": "Prismatische boom · concept",
+    "finish": "Natuur geolied"
+  },
+  "status": "concept",
+  "units": "mm",
+  "joinery": {
+    "type": "housed",
+    "depth": 12,
+    "clearance": 0.4,
+    "endMargin": 12
+  },
+  "cam": {
+    "toolDiameter": 6,
+    "fluteLength": 22,
+    "stepDown": 3,
+    "stepoverPercent": 45,
+    "cutFeed": 900,
+    "plungeFeed": 180,
+    "spindleSpeed": 14000,
+    "safeZ": 15,
+    "cornerMode": "dogbone"
+  }
+}

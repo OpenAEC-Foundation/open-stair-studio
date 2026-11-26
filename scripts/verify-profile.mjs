@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import { inspectStair, starterProject } from '../src/stair.js';
+
+const model = structuredClone(starterProject);
+const errors = () => inspectStair(model).filter(finding => finding.level === 'error');
+model.stair.floorHeight = 4500;
+model.stair.risers = 26;
+assert(errors().some(finding => finding.title.includes('Hoogteverschil')));
+model.stair.type = 'landing';
+assert.deepEqual(errors(), []);
+model.building.upperLandingWidth = null;
+assert(inspectStair(model).some(finding => finding.title === 'Bovenbordes onvolledig ingemeten' && finding.level === 'info'));
+model.building.upperLandingDepth = 790;
+assert(errors().some(finding => finding.title === 'Bovenbordes volgens projectinvoer'));
+model.regulatory.profile = 'UNSET';
+model.stair.width = 300;
+model.stair.stringerThickness = 150;
+assert(errors().some(finding => finding.reference === 'Geometrische invoer'));
+const turning = structuredClone(starterProject);
+Object.assign(turning.stair, { type: 'quarter_winder', going: 220, windersPerQuarter: 4 });
+const turningChecks = inspectStair(turning);
+assert(turningChecks.some(f => f.level === 'error' && f.title === 'Aantrede bij de klimlijn' && f.detail.includes('TR-01-TD-')));
+assert(turningChecks.some(f => f.level === 'info' && f.title === 'Smalle einde beoordelen'));
+console.log('Dimensionele voorcontrole: vluchthoogte, tussenbordes, onvolledige invoer en onmogelijke tredebreedte gecontroleerd.');

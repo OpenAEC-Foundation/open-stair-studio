@@ -1,0 +1,56 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: '. -> target'
+      - name: Check release version
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($tag -ne "v$version") { throw "Tag $tag does not match package version $version" }
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify geometry, calculations and IFC
+        run: npm run verify
+      - name: Build signed Windows installer and updater artifact
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: npm run desktop:build
+      - name: Verify and publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = '${{ github.ref_name }}'
+          $installer = @(Get-ChildItem -LiteralPath 'target/release/bundle/nsis' -Filter '*-setup.exe')
+          if ($installer.Count -ne 1) { throw "Expected one NSIS installer; found $($installer.Count)" }
+          $signature = "$($installer[0].FullName).sig"
+          if (!(Test-Path -LiteralPath $signature)) { throw "Updater signature missing: $signature" }
+          $env:OSS_RELEASE_TAG = $tag
+          $env:OSS_INSTALLER_NAME = $installer[0].Name
+          $env:OSS_SIGNATURE_PATH = $signature
+          node scripts/make-update-manifest.mjs 'target/release/bundle/nsis/latest.json'
+          if ($LASTEXITCODE -ne 0) { throw 'Update manifest validation failed' }
+          gh release create $tag $installer[0].FullName $signature 'target/release/bundle/nsis/latest.json' --verify-tag --title "Open Stair Studio $tag" --notes-file '.github/release-notes.md' --latest
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub release publication failed' }

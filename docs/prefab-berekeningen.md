@@ -1,0 +1,51 @@
+# Rekendossier prefab vluchten en bordessen
+
+Schakel bij een betontrap de detaillering met wapening en instortdelen in. Kies op het prefabwerkblad een merk. Dat merk heeft een eigen doorsnede, zwaartepunt, steunreacties, hijsankers en controles. De trapopstelling levert de basiswaarden. In **Elementhijsplan** kun je per vlucht of bordes de hijsconfiguratie, huls, vereiste en gemeten jonge betonsterkte en documentreferenties aanpassen. De modelmassa is het volume van de betonomhullende maal de opgegeven volumieke massa van het gewapende element. Daarin is de massa van het instortstaal al meegerekend. [Bijlegwapening en hijsplannen](bijlegwapening-en-hijsplannen.md)
+
+## Gebruiksfase
+
+Een vlucht overspant horizontaal tussen de harten van beide oplegstrips. De permanente gewichtsresultante grijpt aan in het zwaartepunt van het getrapte profiel inclusief nokken, sponningen en afschuiningen. Bij een enkelvoudig opgelegde balk vormt deze vervanging door een puntresultante een bovengrens voor het positieve veldmoment onder hetzelfde eigengewicht. De steunreacties volgen rechtstreeks uit het evenwicht. De afwerking en gelijkmatig verdeelde gebruiksbelasting werken op de horizontale projectie tussen de oplegharten. De alternatieve gebruikspuntlast wordt voor iedere te toetsen snede op de ongunstigste plaats gezet.
+
+Een bordes overspant in de breedterichting tussen twee doorlopende zijdelingse gebouwopleggingen. De permanente en veranderlijke oplegreacties van de aansluitende vluchten belasten hun werkelijke strook van één vluchtbreedte. Op het tussenbordes liggen deze stroken aan weerszijden van het schalmgat. De berekening vergelijkt de verdeelde gebruiksbelasting op bordes en vluchten met één verplaatsbare gebruikspuntlast. Per steunpunt en voor het positieve moment geldt de ongunstigste combinatie met de permanente last. De twee reactiemaxima kunnen uit verschillende belastingsposities komen.
+
+Alle reactiekrachten en momenten zijn als ontwerpwaarden herkenbaar. De ontwerper voert de belastingfactoren in. Bij puntsteunen, ingeklemde randen, een sparing, torsie of een sterk geconcentreerde lastspreiding is een plaat- of lokaal detailmodel nodig. In het model worden vluchten binnen dezelfde trapopstelling aan een bordes gekoppeld. Een extra vlucht of bouwdeel uit een ander object vraagt een aanvullende belasting op de werkelijke draagconstructie.
+
+## Hoofdwapening, opleg en verbinding
+
+De berekening telt de diameters van de werkelijke langsstaven in de onderlaag op. Bij een bordes wordt alleen staal in het volle plaatgedeelte meegerekend. De effectieve hoogte van een vlucht wordt loodrecht op de loopplaat gemeten. Het model gebruikt een rechthoekig spanningsblok voor een enkelgewapende doorsnede in normaal beton met fck tot 50 MPa. Voor het gewone positieve moment gelden de volgende betrekkingen in N en mm.
+
+| Grootheid | Berekening |
+| --- | --- |
+| Ontwerpsterkten | fcd = αcc × fck / γc en fyd = fyk / γs |
+| Drukzone en hefboomsarm | x = As × fyd / (0,8 × b × fcd) en z = d − 0,4 × x |
+| Positieve momentweerstand | MRd = As × fyd × z |
+| Minimumtrekwapening | As,min = max(0,26 × fctm / fyk, 0,0013) × b × d met fctm = 0,30 × fck^(2/3) |
+| Dwarskracht zonder beugels | VRd,c = max(0,18/γc × k × (100 × ρ × fck)^(1/3), 0,035 × k^(3/2) × √fck) × b × d |
+
+Voor de dwarskracht geldt k = min(2, 1 + √(200/d)) en ρ = min(0,02, As/(b × d)). De controle gebruikt de volledige verticale reactiekracht en veronderstelt dat de getelde langsstaven verankerd zijn. Het momentmodel vereist x/d ≤ 0,45 en vloeirek in het trekstaal. Buiten dit gebied blijft de deeltoets open. De berekeningen volgen de vereenvoudigde eerste-generatie-EC2-betrekkingen. De toepasselijke normeditie, nationale bijlage, belastingcombinaties en projectfactoren moeten in het definitieve ontwerp zijn vastgelegd. De Europese Commissie publiceerde de onderliggende ontwerp- en detailleringsvoorbeelden samen met CEN/TC250. Voor de producteisen is EN 14843 relevant. [JRC, ontwerpvoorbeelden gewapend beton](https://eurocodes.jrc.ec.europa.eu/publications/eurocode-2-background-appications-design-concrete-buildings-worked-examples) · [NEN-EN 14843, vooraf vervaardigde betonproducten voor trappen](https://www.nen.nl/nen-en-14843-2007-en-113944)
+
+Bij een vlucht is de gemiddelde oplegdruk gelijk aan de grootste verticale reactie gedeeld door de werkelijk getekende stripbreedte en vluchtbreedte. Voor een bordes wordt de grootste verticale steunreactie vergeleken met de ingevoerde ontwerpweerstand per volledige zijoplegging. Geef voor de afzonderlijke horizontale bevestiging de maatgevende trek en afschuiving op één verbinding op, inclusief de effecten van montage, excentriciteit en groepswerking. De inbedding wordt vergeleken met de benodigde lengte. Voor de sterktevergelijking geldt NEd/NRd + VEd/VRd ≤ 1. De verstrekte ontwerpweerstanden en de toepasbaarheid van deze interactie moeten voor zowel de ingestorte zijde als de tegenconstructie zijn onderbouwd. Nokken, sponningen, splijten, randafstanden, staalbreuk, uittrekken en werkelijke aansluittoleranties horen in het aansluitdetail. De technische gegevens van Schöck en Peikko laten zien hoe sterk de belastingsoverdracht afhangt van producttype en aangrenzend beton. [Schöck, technische informatie trapopleggingen](https://www.schoeck.com/viewfile/13815/Technical_Information_Schoeck_Tronsole___13815__.pdf) · [Peikko, bordesondersteuning](https://www.peikko.com/products/product/stairpod/)
+
+## Ontkisten en hijsen
+
+Bevestig in de invoer dat een kaal prefab element wordt gehesen en dat de opgegeven bulkdichtheid het ingestorte staal omvat. Bij hekken, gemonteerde hulpconstructies, ballast of een afwijkende gietstand zijn de werkelijke totale hijsmassa, het gecombineerde zwaartepunt en het gebruikte hijsplan nodig. De applicatie houdt in die toestand de strengkracht en de tijdelijke momentvergelijking open. Het zwaartepunt van de kale mal blijft herkenbaar bij de elementgegevens.
+
+De vier getekende hijspunten liggen in twee stations. Het eigengewicht is G = massa × 9,81 / 1000 in kN. Het driedimensionale zwaartepunt volgt uit de maldoorsnede en de elementbreedte. In de vlakke lastverdeling bepaalt de excentriciteit ten opzichte van beide stations de verticale reactie per station. Bij twee effectief dragende strengen wordt de volledige zwaarste stationreactie aan één punt toegekend. Bij vier punten met vereffenende balken in beide richtingen wordt elke stationreactie over de twee werkelijke dwarsafstanden verdeeld. Het zwaartepunt moet binnen de hefconfiguratie vallen. Deze aannamen en de stabiliteit van de ophanging moeten overeenkomen met het hijsplan.
+
+De stationresultanten moeten verticaal zijn. Bij schuine strengen borgt een aangetoond hijsframe dat de onderlinge horizontale krachten per station in evenwicht zijn. De voorgespannen kettinglengten en dwarsverdeling behoren bij dat bewijs. Bij een gemeenschappelijke haak kunnen horizontale krachten door het hoogteverschil tussen de lage en de hoge trede de verticale stationreacties veranderen. Voor die configuratie vraagt het programma een projectspecifieke hijsanalyse en laat het de strengkrachten en hijsmomenten open.
+
+| Fase | Grootste strengkracht |
+| --- | --- |
+| Vrij hijsen | ψdyn × G × grootste gewichtsaandeel / cos(β), met β ten opzichte van verticaal |
+| Loskomen uit de ondermal | (G + qhechting × Acontact) × grootste aandeel van de gezamenlijke resultante / cos(β) |
+| Volledig vrijgezet vóór hijsen | G × grootste gewichtsaandeel / cos(β) voor de statische uitgangssituatie. De aparte dynamische hijscontrole geldt eveneens. |
+
+De ondermalvariant veronderstelt de inbouwstand en verwijderde zijkisten. Het contactoppervlak en zijn excentriciteit volgen uit de werkelijk naar beneden gerichte profielvlakken, inclusief de schuine onderzijde. Bij dit statische loskommodel wordt de hijsdynamiek apart op de vrije hijsfase toegepast. Bij andere fasering of malwrijving hoort een aangepast hijsplan. Voor 1.000 kg, twee symmetrisch dragende strengen, 30° uit verticaal, ψdyn = 1 en een vrijgezet element volgt 5,664 kN per streng.
+
+De WLL is de toelaatbare last van de volledige anker-koppelingcombinatie, in kN, voor de opgegeven trekrichting, inbedding en jonge betonsterkte. Voor een toets binnen de ingevoerde grens zijn product- en hijsplanreferenties en de vereiste en aangetoonde kubusdruksterkte nodig. Bij ontbrekende documenten blijft een vergelijking open. Een overschrijding van een reeds ingevulde capaciteit blijft zichtbaar. Fabrikantinstructies behandelen daarnaast de bijlegwapening, hefmiddelen, randafstanden en toelaatbare belastingsrichtingen. [Peikko, JENKA technische handleiding en montage-instructies](https://www.peikko.com/products/product/jenka-lifting-system/)
+
+Het vrije hijsmoment omvat de overstekken buiten de stations. Langs een vlucht varieert het eigengewicht met de hoogte van het werkelijke malprofiel. Het programma integreert de lineair variërende verticale doorsnede tussen alle hoekpunten en zoekt de momenten bij de stations, profielovergangen en nulpunten van de dwarskracht. Over de bordesbreedte is het eigengewicht gelijkmatig. De opgegeven tijdelijke UGT-factor en de hijsdynamiek werken op dit eigengewicht. Het positieve moment wordt vergeleken met het ondernet en het negatieve moment met het bovennet. Hiervoor voert de ontwerper de jonge karakteristieke cilindersterkte in, onafhankelijk van de kubussterkte die de leverancier voor de WLL voorschrijft. De eenrichtingsberekening heeft nog een toets nodig voor dwarsbuiging rondom de hijspunten, lokale trek en pons, tijdelijke ondersteuning op de vrachtauto, kantelen, scheurvorming en de montagevolgorde.
+
+## Controle reproduceren
+
+Voer `node scripts/verify-precast-engineering.mjs` uit. De proef vergelijkt onder meer het vluchtzwaartepunt met berekende steunreacties, de twee stroken met de bordesreactie, twee en vier dragende strengen, ontkisthechting, positieve en negatieve hijsmomenten en onvolledige productgegevens. Een onafhankelijke handproef voor een gelijkmatig belaste plaat van 2 m met een totale last van 20 kN en 400 mm overstek aan beide uiteinden geeft 0,8 kNm negatief boven de hijsstations en 1,0 kNm positief tussen de stations.
