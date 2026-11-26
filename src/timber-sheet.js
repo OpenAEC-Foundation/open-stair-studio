@@ -101,7 +101,9 @@ export function timberViews(row, stationIndex = 0) {
     const p=row.part, top=diagram('Plankvoet · bovenaanzicht',[line(p.faceContour)],'Lokale X langs de voorrand. Y loopt van de zichtzijde naar achteren.');
     if (row.type==='nosingStrip') return [top,diagram('Wellat · dwarsdoorsnede',[line(p.profileContour)],'Gemeten loodrecht op de lengteas van de wellat.')];
     const t=p.stockThicknessMm,h=p.stockWidthMm;
-    return [top,diagram('Stootbord · dwarsdoorsnede',[line([point(0,0),point(t,0),point(t,h),point(0,h)])],'Verticale richting geeft de plankhoogte. Horizontale richting geeft de dikte.')];
+    return [top,diagram('Stootbord · dwarsdoorsnede',[line(p.profileContour??[point(0,0),point(t,0),point(t,h),point(0,h)])],
+      p.profileContour?'Onder- en bovenaansluiting in de looprichting. Verticale maat is de vrije hoogte; de ruwplank volgt de schuine ontwikkelde lengte.':
+        'Verticale richting geeft de plankhoogte. Horizontale richting geeft de dikte.')];
   }
   return uprightViews(row.part, stationIndex);
 }

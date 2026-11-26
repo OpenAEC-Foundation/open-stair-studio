@@ -43,6 +43,18 @@
   {#if stair.riserBoards==='closed'}
     <label for="stair-riser-thickness">Dikte stootbord (mm)</label>
     <input id="stair-riser-thickness" class="text-field" type="number" min="8" max="42" value={stair.riserThickness} onchange={e=>update('riserThickness',e.currentTarget)} />
+    {#if !['quarter_winder','half_winder'].includes(stair.type)}
+      <label for="stair-riser-position">Aansluiting stootbord</label>
+      <select id="stair-riser-position" value={stair.riserPosition??'auto'} onchange={e=>update('riserPosition',e.currentTarget.value)}>
+        <option value="auto">Automatisch · sluit tussen de treden</option><option value="manual">Boven- en onderzijde instellen</option>
+      </select>
+    {/if}
+    {#if stair.riserPosition==='manual' && !['quarter_winder','half_winder'].includes(stair.type)}
+      <label for="stair-riser-top">Bovenzijde achter tredevoorzijde (mm)</label>
+      <input id="stair-riser-top" class="text-field" type="number" min="0" max="80" value={stair.riserTopInset} onchange={e=>update('riserTopInset',e.currentTarget)} />
+      <label for="stair-riser-bottom">Onderzijde vóór achterrand ondertrede (mm)</label>
+      <input id="stair-riser-bottom" class="text-field" type="number" min={stair.riserThickness} max="100" value={stair.riserBottomInset} onchange={e=>update('riserBottomInset',e.currentTarget)} />
+    {/if}
     <label for="wood-wellat">Wellat onder de neus</label><select id="wood-wellat" value={stair.wellatType} onchange={e=>update('wellatType',e.currentTarget.value)}><option value="none">Geen</option><option value="chamfered">Met vellingkant</option></select>
     {#if stair.wellatType==='chamfered'}{#each [['wellatWidth','Breedte',3,35],['wellatHeight','Hoogte',5,45]] as [key,name,min,max]}<label for={'wood-'+key}>{name} wellat (mm)</label><input class="text-field" id={'wood-'+key} type="number" {min} {max} value={stair[key]} onchange={e=>update(key,e.currentTarget)}/>{/each}{/if}
   {/if}

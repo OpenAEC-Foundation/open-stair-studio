@@ -3,7 +3,8 @@ import { treadClearanceIssue } from './stair-validity.js';
 import { nosingStrip, riserStock } from './timber-riser.js';
 import { buildTimberBalustrade } from './timber-balustrade.js';
 
-export const detailDefaults = { railSide:'none', railHeight:950, riserBoards:'none', riserThickness:18 };
+export const detailDefaults = { railSide:'none', railHeight:950, riserBoards:'none', riserThickness:18,
+  riserPosition:'auto', riserTopInset:0, riserBottomInset:18 };
 export const newDesignDetails = { ...detailDefaults, railSide:'both', riserBoards:'closed' };
 const point = (x,y,z) => ({x,y,z});
 const mix = (a,b,t) => point(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t);
@@ -180,12 +181,53 @@ function riserParts(stair,geometry) {
     parts.push({id,label:'Houten stootbord',kind:'plate',material:'timber',heightMm:top-bottom,...riserStock(points,direction,top-bottom,stair.riserThickness),
       thicknessMm:stair.riserThickness,volumeM3:planArea*(top-bottom)/1e9,faces:prism(points,bottom,top)});
   };
+  // A recessed tread starts beyond the back of the tread below it. Connect
+  // those two real edges with a sheared panel instead of leaving a slit.
+  const addStraight=(t,flight)=>{
+    const height=rise-t.thickness,thickness=stair.riserThickness;
+    if(height<=0) return;
+    const nose=Number(stair.nosing)||0;
+    const topInset=stair.riserPosition==='manual'?Number(stair.riserTopInset):Math.max(0,nose-thickness);
+    const bottomInset=stair.riserPosition==='manual'?Number(stair.riserBottomInset):thickness;
+    const topX=topInset,heightRatio=height>0?1/height:0;
+    let horizontalThickness=thickness,bottomX=nose-bottomInset;
+    if(stair.riserPosition!=='manual'){
+      for(let i=0;i<12;i++){
+        bottomX=nose-horizontalThickness;
+        horizontalThickness=thickness*Math.hypot(1,(topX-bottomX)*heightRatio);
+      }
+      bottomX=nose-horizontalThickness;
+    } else horizontalThickness=thickness*Math.hypot(1,(topX-bottomX)*heightRatio);
+    const d=t.direction,normal={x:-d.y,y:d.x};
+    const frontRun=(t.step-1)*Number(stair.going)-nose,halfClear=Number(stair.width)/2-Number(stair.stringerThickness);
+    const centre={x:flight.origin.x+d.x*frontRun,y:flight.origin.y+d.y*frontRun};
+    const a={x:centre.x-normal.x*halfClear,y:centre.y-normal.y*halfClear};
+    const b={x:centre.x+normal.x*halfClear,y:centre.y+normal.y*halfClear};
+    const at=(side,x,z)=>({x:(side?b.x:a.x)+d.x*x,y:(side?b.y:a.y)+d.y*x,z});
+    const bottom=t.elevation-rise,top=t.elevation-t.thickness;
+    const vertices=[at(0,bottomX,bottom),at(0,bottomX+horizontalThickness,bottom),at(0,topX+horizontalThickness,top),at(0,topX,top),
+      at(1,bottomX,bottom),at(1,bottomX+horizontalThickness,bottom),at(1,topX+horizontalThickness,top),at(1,topX,top)];
+    const faces=[[0,3,2,1],[4,5,6,7],[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7]]
+      .map(indices=>indices.reverse().map(i=>vertices[i]));
+    const width=Math.hypot(b.x-a.x,b.y-a.y),developed=Math.hypot(height,topX-bottomX);
+    const minX=Math.min(topX,bottomX);
+    const profileContour=[{x:bottomX-minX,y:0},{x:bottomX+horizontalThickness-minX,y:0},
+      {x:topX+horizontalThickness-minX,y:height},{x:topX-minX,y:height}];
+    const points=[at(0,topX,0),at(0,topX+horizontalThickness,0),at(1,topX+horizontalThickness,0),at(1,topX,0)];
+    parts.push({id:t.id+'-SB',label:'Houten stootbord',kind:'plate',role:'riser',material:'timber',
+      heightMm:height,developedHeightMm:developed,topInsetMm:topInset,bottomInsetMm:bottomInset,
+      profileContour,
+      ...riserStock(points,d,developed,thickness),thicknessMm:thickness,
+      volumeM3:width*developed*thickness/1e9,faces});
+  };
   for(const flight of geometry.flights) {
     const treads=geometry.treads.filter(t=>t.flightIndex===flight.index);
     for(const t of treads) {
       const offset=Math.max(0,stair.nosing-stair.riserThickness);
-      const footprint=strip(t.points,t.frontEdge[0],t.direction,offset,offset+stair.riserThickness);
-      add(t.id+'-SB',footprint,t.elevation-rise,t.elevation-t.thickness,t.direction);
+      if(geometry.dimensions.family.winder){
+        const footprint=strip(t.points,t.frontEdge[0],t.direction,offset,offset+stair.riserThickness);
+        add(t.id+'-SB',footprint,t.elevation-rise,t.elevation-t.thickness,t.direction);
+      } else addStraight(t,flight);
       if(stair.wellatType==='chamfered') {
         const trim=nosingStrip(t,stair,strip,offset);
         if(trim) parts.push(trim);

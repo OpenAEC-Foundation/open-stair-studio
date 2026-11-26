@@ -2,7 +2,13 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
-## Nieuw in 0.13.4
+## Nieuw in 0.13.5
+
+- Gesloten houten stootborden sluiten bij een terugliggende trede automatisch aan op de boven- en ondertrede. Waar nodig volgt het bord een schuine lijn.
+- Voor rechte vluchten zijn de boven- en onderaansluiting handmatig instelbaar. De tool controleert of het bord onder de bovenste trede en binnen de onderste trede blijft.
+- Het stootbord heeft een gesloten 3D-solid, een schuine doorsnede en ontwikkelde ruwmaat op het houtdetailblad. Calculatie en IFC4 gebruiken dezelfde vorm.
+
+## Eerder toegevoegd in 0.13.4
 
 - De tredevoorzijde kan nu vóór of achter de keep liggen: een negatieve neusmaat geeft een terugliggende neus.
 - Ook de zijrand kan met een negatieve maat binnen de keepboom liggen. De tool controleert de resterende oplegbreedte.

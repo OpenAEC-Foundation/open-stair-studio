@@ -36,6 +36,16 @@ export function geometryErrors(stair, d, system='timber') {
   }
   if (Number(stair.going)+Number(stair.nosing)<50)
     add('Trede te kort','De terugliggende neus laat minder dan 50 mm tredevlak over. Verklein de terugligging of vergroot de aantrede.');
+  if(system==='timber'&&stair.riserBoards==='closed'&&stair.riserPosition==='manual'&&!isWinder(stair.type)){
+    const height=d.rise-Number(stair.treadThickness),top=Number(stair.riserTopInset),bottom=Number(stair.nosing)-Number(stair.riserBottomInset);
+    const horizontalThickness=height>0?Number(stair.riserThickness)*Math.hypot(1,(top-bottom)/height):Infinity;
+    if(Number(stair.riserBottomInset)<horizontalThickness)
+      add('Stootbord steekt voorbij ondertrede','De onderaansluiting moet minstens de stootborddikte binnen de achterrand van de ondertrede liggen.');
+    if(top+horizontalThickness>Number(stair.going)+Number(stair.nosing))
+      add('Stootbord past niet onder boventrede','Verklein de bovenaansluiting of vergroot de trede zodat het stootbord onder de trede past.');
+    if(Number(stair.riserBottomInset)>Number(stair.going)+Number(stair.nosing))
+      add('Stootbord mist ondertrede','De onderaansluiting ligt vóór de onderste trede. Verklein de ondermaat of vergroot de trede.');
+  }
   if((stair.stringerLeft==='cut'||stair.stringerRight==='cut') &&
     Number(stair.stringerThickness)+Number(stair.stringerOverhang)<10)
     add('Trede mist keepboom','De trederand ligt te ver binnen de boom: er blijft minder dan 10 mm oplegvlak op de keep over.');

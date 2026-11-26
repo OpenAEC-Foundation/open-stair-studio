@@ -3,6 +3,8 @@ import * as IFC from 'web-ifc';
 import { generateStairGeometry, inspectStair, stairFamilies, starterProject } from '../src/stair.js';
 import { buildStairDetails, detailDefaults, newDesignDetails } from '../src/stair-details.js';
 import { createIfc4WithApi } from '../src/ifc-export-core.js';
+import {readProject} from '../src/project.js';
+import {timberSheetParts,timberViews} from '../src/timber-sheet.js';
 
 const near=(a,b)=>assert(Math.abs(a-b)<1e-6,`${a} != ${b}`);
 const key=p=>[p.x,p.y,p.z].map(x=>Math.round(x*1e6)).join(',');
@@ -75,9 +77,44 @@ for(const type of ['half_turn','quarter_turn']) {
     assert(Math.min(Math.abs(x-Math.max(...xs)),Math.abs(y-Math.min(...ys)),Math.abs(y-Math.max(...ys)))<=stair.stringerThickness);
   }
 }
-
 const api=new IFC.IfcAPI();
 await api.Init();
+for(const type of ['straight','quarter_turn','landing','half_turn'])
+for(const nose of [-25,0,25]){
+  const {stair,geometry,parts}=shape(type,{railSide:'none',nosing:nose});
+  const tread=geometry.treads[1],board=parts.find(p=>p.id===tread.id+'-SB');
+  assert(board,`${type} ${nose} stootbord`);
+  near(board.volumeM3,volume(board.faces)/1e9);
+  assert(board.stockWidthMm>=board.heightMm);
+  const station=p=>(p.x-tread.frontEdge[0].x)*tread.direction.x+(p.y-tread.frontEdge[0].y)*tread.direction.y;
+  const top=board.faces.flat().filter(p=>Math.abs(p.z-(tread.elevation-tread.thickness))<1e-6);
+  const bottom=board.faces.flat().filter(p=>Math.abs(p.z-(tread.elevation-geometry.dimensions.rise))<1e-6);
+  near(Math.min(...top.map(station)),Math.max(0,nose-stair.riserThickness));
+  near(Math.max(...bottom.map(station)),nose);
+  const model={...structuredClone(starterProject),stair};
+  assert(createIfc4WithApi(api,model,geometry).bytes.length>0);
+}
+{
+  const {stair,geometry,parts}=shape('straight',{railSide:'none',nosing:-25,riserPosition:'manual',riserTopInset:12,riserBottomInset:25});
+  const tread=geometry.treads[1],board=parts.find(p=>p.id===tread.id+'-SB');
+  assert.equal(board.topInsetMm,12);assert.equal(board.bottomInsetMm,25);
+  assert(board.developedHeightMm>board.heightMm);
+  near(board.volumeM3,volume(board.faces)/1e9);
+  assert.equal(readProject({...structuredClone(starterProject),stair}).stair.riserTopInset,12);
+  const row=timberSheetParts(geometry,parts).find(p=>p.id===board.id);
+  const section=timberViews(row)[1].paths[0].points;
+  assert(section[0].x!==section[3].x,'werkblad toont schuine stootbordzijde');
+  assert(inspectStair({...structuredClone(starterProject),stair}).every(f=>f.title!=='Stootbord past niet onder boventrede'));
+}
+{
+  const {stair,geometry,parts}=shape('quarter_turn',{railSide:'none',nosing:-25,
+    stringerLeft:'cut',stringerRight:'housed',stringerOverhang:20});
+  const board=parts.find(p=>p.id===geometry.treads[1].id+'-SB');
+  const ys=board.faces.flat().map(p=>p.y);
+  near(Math.max(...ys)-Math.min(...ys),stair.width-2*stair.stringerThickness);
+  near(board.volumeM3,volume(board.faces)/1e9);
+}
+
 {
   const stair={...starterProject.stair,...newDesignDetails,type:'straight',floorHeight:1040,risers:26,treadThickness:45};
   const model={...structuredClone(starterProject),stair};

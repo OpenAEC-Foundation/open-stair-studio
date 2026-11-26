@@ -21,6 +21,14 @@ with sync_playwright() as playwright:
     page.locator('#nosing').press('Tab')
     assert page.locator('#stringer-overhang').input_value()=='-20'
     assert page.locator('#nosing').input_value()=='-25'
+    page.locator('#stair-riser-boards').select_option('closed')
+    page.locator('#stair-riser-position').select_option('manual')
+    page.locator('#stair-riser-top').fill('12')
+    page.locator('#stair-riser-top').press('Tab')
+    page.locator('#stair-riser-bottom').fill('25')
+    page.locator('#stair-riser-bottom').press('Tab')
+    assert page.locator('#stair-riser-top').input_value()=='12'
+    assert page.locator('#stair-riser-bottom').input_value()=='25'
     if len(sys.argv)>2:
         page.locator('canvas[aria-label="3D-model van de trap"]').wait_for(timeout=30000)
         page.get_by_text('3D-weergave laden…').wait_for(state='hidden',timeout=30000)
@@ -44,4 +52,4 @@ with sync_playwright() as playwright:
     assert page.get_by_role('button',name='Volledige wang-DXF').is_enabled()
     assert not errors,errors
     browser.close()
-print('UI: terugliggende neus en trederand, werkblad, gesloten DXF en CNC-grens gecontroleerd.')
+print('UI: terugliggende neus, variabel stootbord, werkblad, DXF en CNC-grens gecontroleerd.')
