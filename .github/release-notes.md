@@ -2,6 +2,11 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.9
+
+- Nieuw project toont bij niet opgeslagen wijzigingen een duidelijke bevestiging in het appvenster. Annuleren bewaart het huidige project; bevestigen start een vers project en vervangt het automatisch herstelde concept.
+- De opdracht Nieuw project is ook direct beschikbaar in de titelbalk en met Ctrl+N.
+
 ## Nieuw in 0.13.8
 
 - Een neusverstelling verplaatst nu de volledige trede naar voren of achteren. Bij rechte vluchten blijft de trede even lang; ook de rugzijde, uitsparing in de keepboom en het stootbord volgen de nieuwe positie.

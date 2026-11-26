@@ -48,6 +48,7 @@
   let session = startSession(model);
   let openRequest = 0;
   let projectFile;
+  let newProjectDialog;
   let activeRibbon = 'Trap ontwerpen';
   let activeView = '3D-model';
   let wellSelection = '';
@@ -252,6 +253,7 @@
     }
     const onKeyDown = event => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') { event.preventDefault(); projectFile?.click(); }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'n') { event.preventDefault(); newProject(); }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveProject(); }
@@ -304,7 +306,14 @@
     commitSession(redoSession(session));
   }
   function newProject() {
-    if (dirty && !window.confirm('Niet opgeslagen wijzigingen verwerpen en een nieuw project starten?')) return;
+    if (dirty) {
+      if (!newProjectDialog.open) newProjectDialog.showModal();
+      return;
+    }
+    createNewProject();
+  }
+  function createNewProject() {
+    if (newProjectDialog.open) newProjectDialog.close();
     openRequest++;
     const next = freshDesign();
     next.project = { ...next.project, name: 'Nieuw trapproject', number: 'OSS-NIEUW', revision: 'A' };
@@ -313,7 +322,7 @@
     resetCamera();
     commitSession(startSession(next, false), 'Nieuw trapproject aangemaakt');
     hostContext=null;
-    wellSelection=''; activeRibbon='Trap ontwerpen'; activeView='3D-model';
+    wellSelection=''; activeRibbon='Trap ontwerpen'; activeView='3D-model'; rightTab='Eigenschappen';
   }
   function downloadFile(name, content, type) {
     const blob = new Blob([content], { type });
@@ -456,6 +465,7 @@
     <div class="quick-access">
       <img src="/icon.png" alt="" class="app-icon" />
       <span class="titlebar-divider"></span>
+      <button class="quick-button" title="Nieuw project (Ctrl+N)" aria-label="Nieuw project" onclick={newProject}><Icon name="file.new" /></button>
       <button class="quick-button" title="Project openen (Ctrl+O)" aria-label="Project openen" onclick={() => projectFile.click()}><Icon name="file.open" /></button><input bind:this={projectFile} type="file" accept=".json,.oss.json" onchange={openProject} hidden />
       <button class="quick-button" title="Project opslaan" onclick={saveProject}><Icon name="file.save" /></button>
       <button class="quick-button" title="Ongedaan maken" disabled={!history.length} onclick={undo}><Icon name="edit.undo" /></button>
@@ -794,4 +804,12 @@
 
   <footer class="statusbar oa-statusbar"><div class="status-left"><span class="status-indicator"></span><span>{activeView==='Trapontwerp' ? 'Trapontwerp · '+(wellItem?.mark??model.project.number) : model.stair.mark+' · '+model.stair.name}</span><span class="status-dimensions">{activeView==='Trapontwerp'?well.length:model.stair.width} × {activeView==='Trapontwerp'?well.width:model.stair.floorHeight} mm</span><span class="status-muted">{activeView==='Trapontwerp'?'Coördinatiemodel':materialLabel}</span></div><div class="status-right"><span>{dirty ? 'Niet opgeslagen' : 'Concept'}</span><span class="status-separator"></span><span>{ruleProfiles.find(p => p.id === model.regulatory.profile)?.label}</span><span class="status-separator"></span><span>OSS {model.version}</span></div></footer>
   {#if toast}<div class="toast">{toast}</div>{/if}
+  <dialog bind:this={newProjectDialog} class="oa-dialog new-project-dialog" aria-labelledby="new-project-heading" aria-describedby="new-project-message">
+    <h2 id="new-project-heading" class="oa-heading oa-heading--dialog">Nieuw project starten?</h2>
+    <p id="new-project-message">Het huidige project heeft niet opgeslagen wijzigingen. Sla het eerst op als je deze wilt bewaren.</p>
+    <div class="oa-dialog-actions">
+      <button class="oa-button" type="button" onclick={() => newProjectDialog.close()}>Huidig project behouden</button>
+      <button class="oa-button oa-button--primary" type="button" onclick={createNewProject}>Nieuw project starten</button>
+    </div>
+  </dialog>
 </div>

@@ -33,7 +33,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.8',
+  version: '0.13.9',
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
   engineering: { ...defaultEngineering },
