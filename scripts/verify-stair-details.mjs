@@ -86,6 +86,7 @@ for(const nose of [-25,0,25]){
   assert(board,`${type} ${nose} stootbord`);
   near(board.volumeM3,volume(board.faces)/1e9);
   assert(board.stockWidthMm>=board.heightMm);
+  assert(board.stockVolumeM3>=board.volumeM3-1e-12);
   const station=p=>(p.x-tread.frontEdge[0].x)*tread.direction.x+(p.y-tread.frontEdge[0].y)*tread.direction.y;
   const top=board.faces.flat().filter(p=>Math.abs(p.z-(tread.elevation-tread.thickness))<1e-6);
   const bottom=board.faces.flat().filter(p=>Math.abs(p.z-(tread.elevation-geometry.dimensions.rise))<1e-6);
@@ -99,6 +100,7 @@ for(const nose of [-25,0,25]){
   const tread=geometry.treads[1],board=parts.find(p=>p.id===tread.id+'-SB');
   assert.equal(board.topInsetMm,12);assert.equal(board.bottomInsetMm,25);
   assert(board.developedHeightMm>board.heightMm);
+  assert(board.stockWidthMm>board.developedHeightMm);
   near(board.volumeM3,volume(board.faces)/1e9);
   assert.equal(readProject({...structuredClone(starterProject),stair}).stair.riserTopInset,12);
   const row=timberSheetParts(geometry,parts).find(p=>p.id===board.id);

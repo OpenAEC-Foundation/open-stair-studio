@@ -210,6 +210,7 @@ function riserParts(stair,geometry) {
     const faces=[[0,3,2,1],[4,5,6,7],[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7]]
       .map(indices=>indices.reverse().map(i=>vertices[i]));
     const width=Math.hypot(b.x-a.x,b.y-a.y),developed=Math.hypot(height,topX-bottomX);
+    const stockHeight=developed+Math.abs(topX-bottomX)*horizontalThickness/developed;
     const minX=Math.min(topX,bottomX);
     const profileContour=[{x:bottomX-minX,y:0},{x:bottomX+horizontalThickness-minX,y:0},
       {x:topX+horizontalThickness-minX,y:height},{x:topX-minX,y:height}];
@@ -217,7 +218,7 @@ function riserParts(stair,geometry) {
     parts.push({id:t.id+'-SB',label:'Houten stootbord',kind:'plate',role:'riser',material:'timber',
       heightMm:height,developedHeightMm:developed,topInsetMm:topInset,bottomInsetMm:bottomInset,
       profileContour,
-      ...riserStock(points,d,developed,thickness),thicknessMm:thickness,
+      ...riserStock(points,d,stockHeight,thickness),thicknessMm:thickness,
       volumeM3:width*developed*thickness/1e9,faces});
   };
   for(const flight of geometry.flights) {
