@@ -13,21 +13,22 @@ const triangleVolume=(a,b,c)=>(a.x*(b.y*c.z-b.z*c.y)+a.y*(b.z*c.x-b.x*c.z)+a.z*(
 export function makeCutStringer(stair,flight,side,normal,rise) {
   const going=Number(stair.going), treadThickness=Number(stair.treadThickness);
   const thickness=Number(stair.stringerThickness), depth=Number(stair.stringerDepth);
+  const nose=Number(stair.nosing)||0;
   const entry=flight.index>0?1:0;
-  const startX=-entry*going;
+  const startX=entry?-going:-nose;
   const top=[];
   if(entry){
     const landingZ=flight.firstRiser*rise-Number(stair.landingThickness||treadThickness);
-    top.push({x:startX,z:landingZ},{x:0,z:landingZ});
+    top.push({x:startX,z:landingZ},{x:-nose,z:landingZ});
   }
   for(let step=0;step<flight.treadCount;step++){
     const z=(flight.firstRiser+step+1)*rise-treadThickness;
-    top.push({x:step*going,z},{x:(step+1)*going,z});
+    top.push({x:step*going-nose,z},{x:(step+1)*going-nose,z});
   }
   const compact=top.filter((p,i)=>i===0||p.x!==top[i-1].x||p.z!==top[i-1].z);
   const slope=rise/going;
   const intercept=Math.min(...compact.map(p=>p.z-slope*(p.x-startX)))-depth;
-  const endX=flight.treadCount*going;
+  const endX=flight.treadCount*going-nose;
   const bottomAt=x=>intercept+slope*(x-startX);
   const section=[...compact,{x:endX,z:bottomAt(endX)},{x:startX,z:bottomAt(startX)}];
   const sectionArea=area(section);

@@ -33,7 +33,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.7',
+  version: '0.13.8',
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
   engineering: { ...defaultEngineering },
@@ -156,8 +156,8 @@ export function generateStairGeometry(stair, options) {
     const normal = { x: -flight.direction.y, y: flight.direction.x };
     for (let step = 0; step < flight.treadCount; step++) {
       const nose = Number(stair.nosing) || 0;
-      const physicalRun = going + nose;
-      const center = add(add(flight.origin, scale(flight.direction, (step + 0.5) * going - nose / 2)),scale(normal,treadOffset));
+      const physicalRun = going;
+      const center = add(add(flight.origin, scale(flight.direction, (step + 0.5) * going - nose)),scale(normal,treadOffset));
       const halfRun = scale(flight.direction, physicalRun / 2);
       const halfWidth = scale(normal, treadWidth / 2);
       const level = flight.firstRiser + step + 1;
@@ -238,7 +238,7 @@ export function generateStairGeometry(stair, options) {
 
   const parts = [
     { id: `${stair.mark}-TD`, name: 'Trede · rechthoekig', quantity: treads.length,
-      length: going + (Number(stair.nosing) || 0), width: treadWidth, thickness,
+      length: going, width: treadWidth, thickness,
       volume: treads.reduce((sum, tread) => sum + tread.volume, 0) },
     ...landings.map(landing => ({ id: landing.id, name: 'Bordesplaat · referentiemaat', quantity: 1,
       length: landing.length, width: landing.width, thickness: landing.thickness, volume: landing.volume })),
@@ -300,7 +300,7 @@ export function inspectStair(model, geometry) {
       const compare = (label, value, limit) => addFinding(value < limit ? 'error' : 'ok',
         label, `${value} mm ter plaatse van de klimlijn. Profielminimum ${limit} mm.`, p.article);
       compare('Aantrede', Number(stair.going), p.minGoing);
-      compare('Tredevlak inclusief neus', Number(stair.going) + Number(stair.nosing || 0), p.minTreadDepth);
+      compare('Tredevlak', Number(stair.going), p.minTreadDepth);
     }
     if (d.rise > p.maxRise) addFinding('error', 'Optrede groter dan profielmaximum', `${d.rise.toFixed(1)} mm is meer dan ${p.maxRise} mm.`, p.article);
     else addFinding('ok', 'Optrede voldoet aan profielgrens', `${d.rise.toFixed(1)} mm ≤ ${p.maxRise} mm.`, p.article);

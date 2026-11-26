@@ -21,13 +21,15 @@ const test = (system, changes = {}, shape = geometry, doc = model) =>
   checkResistance({ ...base, ...systems[system], structureType: system, ...changes }, doc, shape);
 const row = (r, id) => r.rows.find(v => v.id === id);
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) <= 1e-10 * Math.max(1, Math.abs(expected)), String(actual) + ' versus ' + expected);
+const treadDepth=geometry.treads[0].length/1000;
+const pointConnection=1.35*0.5*treadDepth*0.8/2+1.5*2;
 
 assert.equal(test('timber').status, 'na');
 for (const system of Object.keys(systems)) {
   const result = test(system);
   assert.equal(result.status, 'pass', JSON.stringify(result));
   assert.equal(result.rows.length, 5);
-  near(row(result, 'connection').demand, 3.07425);
+  near(row(result, 'connection').demand, pointConnection);
   near(row(result, 'patch').demand, 3);
   assert.equal(row(test(system, { connectionRd: 2 }), 'connection').status, 'fail');
   assert.equal(row(test(system, { patchRd: 2 }), 'patch').status, 'fail');
@@ -39,7 +41,7 @@ for (const system of Object.keys(systems)) {
   assert(missingAndOverloaded.reasons.length);
   const area = test(system, { loadArea: 40, loadPoint: 0.01 });
   for (const r of area.rows) assert.match(r.caseLabel, /vlaklast/);
-  near(row(area, 'connection').demand, (1.35 * 0.5 + 1.5 * 40) * 0.275 * 0.8 / 2);
+  near(row(area, 'connection').demand, (1.35 * 0.5 + 1.5 * 40) * treadDepth * 0.8 / 2);
 }
 
 const glassResult = test('glass');
@@ -69,7 +71,7 @@ const local = { supportDetailMode: 'bearing', supportDetailSource: 'Rapport ople
   supportDetailGeometry: 'Randtoleranties en oplegzone', bearingContactLengthMm: 100, bearingContactWidthMm: 20, bearingPressureRd: 2 };
 const bearing = test('glass', local);
 assert.equal(bearing.status, 'pass', JSON.stringify(bearing.reasons));
-near(row(bearing, 'bearing-pressure').demand, 3.07425 * 1000 / 2000);
+near(row(bearing, 'bearing-pressure').demand, pointConnection * 1000 / 2000);
 assert.equal(test('glass', { ...local, supportDetailSource: '' }).status, 'open');
 assert.equal(test('glass', { ...local, bearingPressureRd: 1 }).status, 'fail');
 assert.equal(test('glass', { ...local, supportDetailMode: 'fasteners' }).status, 'open');

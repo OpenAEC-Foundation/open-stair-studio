@@ -4,7 +4,7 @@ import { generateStairGeometry, starterProject } from '../src/stair.js';
 
 // Artificial fixtures in application units. The independent reference below uses kN and m.
 const span = 0.8;
-const depth = 0.275;
+const depth = 0.25;
 const common = {
   ...defaultEngineering, support: 'two-edge', spanMm: 800, loadPoint: 2, deadArea: 0.5,
   gammaG: 1.35, gammaQ: 1.5, pointPatchLengthMm: 50, pointPatchWidthMm: 50,
@@ -122,9 +122,8 @@ function checkWinders() {
       for (const outerShape of ['square', 'faceted']) {
         const stair = { ...starterProject.stair, type, turnDirection, outerShape };
         const geometry = generateStairGeometry(stair);
-        const noOverlap = generateStairGeometry({ ...stair, nosing: 0 });
         assert.equal(geometry.treads.length, 17);
-        const measured = noOverlap.treads.map(sampledBand);
+        const measured = geometry.treads.map(sampledBand);
         geometry.treads.forEach((tread, i) => {
           assert.ok(Math.abs(tread.eligibleAt170Mm - measured[i]) < 0.14,
             `${type}/${turnDirection}/${outerShape}/${tread.id}: ${tread.eligibleAt170Mm} versus ${measured[i]} mm`);

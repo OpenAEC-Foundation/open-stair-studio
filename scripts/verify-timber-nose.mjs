@@ -58,7 +58,9 @@ for(const {id,winder} of stairFamilies) for(const direction of winder?['left','r
     assert(rows[0].includes('Profielmaat mm'));
     for(const [i,t] of w.treads.entries()) {
       total++;
-      const removed=t.area*t.thickness-physicalVolume(t);
+      let removed;
+      try { removed=t.area*t.thickness-physicalVolume(t); }
+      catch(error){throw new Error(`${id} ${direction} ${kind} ${size} housed=${housed} ${t.id}: ${error.message}`,{cause:error});}
       close(removed,t.noseDetail.removedMm3,kind==='round'?t.noseDetail.removedMm3*.003:1e-5);
       close(parts[i].volume,t.volume);
       assert.deepEqual(t.frontEdge,g.treads[i].frontEdge);

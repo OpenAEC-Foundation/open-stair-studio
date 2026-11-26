@@ -52,11 +52,31 @@ assert(geometryErrors(invalid.stair,generateStairGeometry(invalid.stair).dimensi
 const switched=editSession(startSession(invalid),'stair','type','half_winder');
 assert.equal(switched.model.stair.stringerLeft,'housed');
 for(const type of ['straight','quarter_turn','landing','half_turn']){
+  const base=structuredClone(starterProject);
+  Object.assign(base.stair,{type,stringerLeft:'cut',stringerRight:'housed',nosing:0});
+  const reference=generateStairGeometry(base.stair);
+  for(const nose of [-25,25]){
+    const model=structuredClone(base);model.stair.nosing=nose;
+    const shifted=generateStairGeometry(model.stair);
+    for(let i=0;i<shifted.treads.length;i++){
+      const a=reference.treads[i],b=shifted.treads[i],d=shifted.flights[b.flightIndex].direction;
+      assert.equal(b.length,a.length);assert.equal(b.area,a.area);assert.equal(b.volume,a.volume);
+      for(let j=0;j<4;j++){
+        assert(Math.abs(b.points[j].x-a.points[j].x+d.x*nose)<1e-7);
+        assert(Math.abs(b.points[j].y-a.points[j].y+d.y*nose)<1e-7);
+      }
+    }
+    assert.equal(shifted.stringers.find(beam=>beam.profile==='cut').section[0].x,-nose);
+    assert.equal(buildWorkshop(shifted,model).housings.issues.length,0);
+    assert(calculateEstimate(buildWorkshop(shifted,model),model.estimate).materials>0);
+  }
+}
+for(const type of ['straight','quarter_turn','landing','half_turn']){
   const model=structuredClone(starterProject);
   Object.assign(model.stair,{type,stringerLeft:'cut',stringerRight:'cut',nosing:-25,stringerOverhang:-20});
   const geometry=generateStairGeometry(model.stair);
   assert.equal(geometryErrors(model.stair,geometry.dimensions).length,0,type);
-  assert.equal(geometry.treads[0].length,model.stair.going-25);
+  assert.equal(geometry.treads[0].length,model.stair.going);
   assert.equal(geometry.treads[0].width,model.stair.width-40);
   const flight=geometry.flights[0],tread=geometry.treads[0];
   const front=tread.points[0],along=(front.x-flight.origin.x)*flight.direction.x+(front.y-flight.origin.y)*flight.direction.y;
@@ -73,5 +93,13 @@ const unsupported=structuredClone(starterProject);
 unsupported.stair.stringerLeft='cut';unsupported.stair.stringerOverhang=-unsupported.stair.stringerThickness;
 assert(geometryErrors(unsupported.stair,generateStairGeometry(unsupported.stair).dimensions).some(item=>item.title==='Trede mist keepboom'));
 const reversed=editSession(startSession({...starterProject,stair:{...starterProject.stair,nosing:-25}}),'stair','type','quarter_winder');
-assert.equal(reversed.model.stair.nosing,0);
+assert.equal(reversed.model.stair.nosing,-25);
+for(const type of ['quarter_winder','half_winder']){
+  const model=structuredClone(starterProject);
+  Object.assign(model.stair,{type,nosing:-25});
+  const geometry=generateStairGeometry(model.stair);
+  assert.equal(geometryErrors(model.stair,geometry.dimensions).length,0);
+  assert.equal(buildWorkshop(geometry,model).housings?.issues.length??0,0);
+  assert(createIfc4WithApi(api,model,geometry).bytes.length>1000);
+}
 console.log(`Keepbomen: ${checked} vlakke trapvarianten plus vier terugliggende neus- en trederanden, 3D-solid, volume, huizen, DXF en IFC4 gecontroleerd.`);

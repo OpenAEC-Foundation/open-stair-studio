@@ -117,6 +117,10 @@ for (const family of stairFamilies) {
         }
       }
     }
+    if(family.winder) for(const nose of [-25,25]){
+      const result=check({...base,type:family.id,outerShape,nosing:nose},{depth:12,clearance:0.4,endMargin:12});
+      cases++;pockets+=result.beams.reduce((n,job)=>n+job.pockets.length,0);
+    }
   }
 }
 const straight=generateStairGeometry(base);

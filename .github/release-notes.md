@@ -2,6 +2,11 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.8
+
+- Een neusverstelling verplaatst nu de volledige trede naar voren of achteren. Bij rechte vluchten blijft de trede even lang; ook de rugzijde, uitsparing in de keepboom en het stootbord volgen de nieuwe positie.
+- Verdreven treden verschuiven langs de looplijn en worden opnieuw begrensd door hun binnen- en buitenboom. Werkbladen, calculatie, trede- en wang-CNC en IFC4 gebruiken dezelfde geometrie.
+
 ## Nieuw in 0.13.7
 
 - De ruwplank van een schuin stootbord bevat nu ook de benodigde extra lengte voor de zaaghoeken. De calculatie gebruikt die gecorrigeerde ruwmaat.

@@ -36,7 +36,7 @@ const labels = {
   landingScrewsPerJoint: 'Schroeven per stuiknaad', landingScrewDiameter: 'Schroefdiameter', landingScrewLength: 'Schroeflengte',
   landingScrewShearRd: 'Opgegeven schuifweerstand schroef', fastenerUnitPrice: 'Schroefprijs',
   landingTimberE: 'Elasticiteitsmodulus randligger', landingTimberFmRd: 'Buigsterkte randligger', landingDeflectionRatio: 'Doorbuigingscriterium',
-  nosing: 'Neuspositie t.o.v. keep', treadThickness: 'Trededikte', laneGap: 'Tussenruimte',
+  nosing: 'Tredepositie langs looplijn', treadThickness: 'Trededikte', laneGap: 'Tussenruimte',
   riserTopInset:'Bovenaansluiting stootbord',riserBottomInset:'Onderaansluiting stootbord',
   wasteFactor: 'Zaag-/uitvalfactor', marginPercent: 'Brutomarge', laborRate: 'Uurtarief',
   overheadPercent: 'Opslag', laborHours: 'Werkuren', timberPricePerM3: 'Houtprijs',
@@ -148,7 +148,6 @@ export function editSession(session, section, key, value) {
   const model = { ...session.model, [section]: { ...session.model[section], [key]: value } };
   if(section==='stair'&&key==='type'&&['quarter_winder','half_winder'].includes(value)){
     model.stair.stringerLeft='housed';model.stair.stringerRight='housed';
-    model.stair.nosing=Math.max(0,model.stair.nosing);
   }
   // Surveyed widths refer to a particular stair layout. Undo restores both
   // the geometry and the measurements for that layout together.

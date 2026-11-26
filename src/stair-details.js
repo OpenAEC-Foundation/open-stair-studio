@@ -190,13 +190,13 @@ function riserParts(stair,geometry) {
     const topInset=stair.riserPosition==='manual'?Number(stair.riserTopInset):Math.max(0,nose-thickness);
     const bottomInset=stair.riserPosition==='manual'?Number(stair.riserBottomInset):thickness;
     const topX=topInset,heightRatio=height>0?1/height:0;
-    let horizontalThickness=thickness,bottomX=nose-bottomInset;
+    let horizontalThickness=thickness,bottomX=-bottomInset;
     if(stair.riserPosition!=='manual'){
       for(let i=0;i<12;i++){
-        bottomX=nose-horizontalThickness;
+        bottomX=-horizontalThickness;
         horizontalThickness=thickness*Math.hypot(1,(topX-bottomX)*heightRatio);
       }
-      bottomX=nose-horizontalThickness;
+      bottomX=-horizontalThickness;
     } else horizontalThickness=thickness*Math.hypot(1,(topX-bottomX)*heightRatio);
     const d=t.direction,normal={x:-d.y,y:d.x};
     const frontRun=(t.step-1)*Number(stair.going)-nose,halfClear=Number(stair.width)/2-Number(stair.stringerThickness);
@@ -226,7 +226,7 @@ function riserParts(stair,geometry) {
     for(const t of treads) {
       const offset=Math.max(0,stair.nosing-stair.riserThickness);
       if(geometry.dimensions.family.winder){
-        const footprint=strip(t.points,t.frontEdge[0],t.direction,offset,offset+stair.riserThickness);
+        const footprint=strip(t.points,t.frontEdge[0],t.direction,0,stair.riserThickness);
         add(t.id+'-SB',footprint,t.elevation-rise,t.elevation-t.thickness,t.direction);
       } else addStraight(t,flight);
       if(stair.wellatType==='chamfered') {
@@ -246,8 +246,9 @@ function riserParts(stair,geometry) {
       if(direction.x*last.direction.x+direction.y*last.direction.y<0) direction={x:-direction.x,y:-direction.y};
       ref=a;
     } else {
-      ref={x:flight.origin.x+flight.direction.x*stair.going*flight.treadCount,
-        y:flight.origin.y+flight.direction.y*stair.going*flight.treadCount};
+      const end=stair.going*flight.treadCount-(Number(stair.nosing)||0);
+      ref={x:flight.origin.x+flight.direction.x*end,
+        y:flight.origin.y+flight.direction.y*end};
     }
     const footprint=strip(last.points,ref,direction,-stair.riserThickness,0);
     add(`${stair.mark}-V${flight.index+1}-UIT-SB`,footprint,last.elevation,endZ,direction);

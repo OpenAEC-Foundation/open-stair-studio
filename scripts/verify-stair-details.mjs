@@ -91,7 +91,7 @@ for(const nose of [-25,0,25]){
   const top=board.faces.flat().filter(p=>Math.abs(p.z-(tread.elevation-tread.thickness))<1e-6);
   const bottom=board.faces.flat().filter(p=>Math.abs(p.z-(tread.elevation-geometry.dimensions.rise))<1e-6);
   near(Math.min(...top.map(station)),Math.max(0,nose-stair.riserThickness));
-  near(Math.max(...bottom.map(station)),nose);
+  near(Math.max(...bottom.map(station)),0);
   const model={...structuredClone(starterProject),stair};
   assert(createIfc4WithApi(api,model,geometry).bytes.length>0);
 }

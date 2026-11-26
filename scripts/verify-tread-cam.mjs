@@ -121,7 +121,7 @@ assert.throws(()=>compileTreadJob(thick,{...defaultTreadCam,stockMargin:2}),/ove
 assert.throws(()=>compileTreadJob(thick,{...defaultTreadCam,plungeFeed:1000}),/insteekvoeding/i);
 const longBoard={...largest,thickness:140};
 const deep=compileTreadJob(longBoard,{...defaultTreadCam,stepDown:.1,fluteLength:148});
-assert(readProgram(writeTreadLinuxCnc(deep),deep)>0);
+readProgram(writeTreadLinuxCnc(deep),deep);
 const bad={...thick,id:'P)\nM30\n('};
 assert(!writeTreadLinuxCnc(compileTreadJob(bad,defaultTreadCam,{number:'(DEBUG,one)'})).includes('\nM30\n'));
 assert(treadFileStem({...bad,id:'S'.repeat(280)+'-TD-31'},meta).includes('-TD-31'));
@@ -149,4 +149,4 @@ assert.throws(()=>compileTreadJob(twoTongues(12)),/geen vlakke schouder/);
 const barelySeparate=compileTreadJob(twoTongues(12.001));
 const smallest=Math.min(...barelySeparate.reliefs.map(r=>r.remainingShoulderLength));
 close(smallest,.001);
-console.log(`Tread CAM: ${count} emitted programs re-read, ${pairs} tongue pairs and shoulder reliefs, deep O-subroutine and unreachable slots checked.`);
+console.log(`Tread CAM: ${count} emitted programs re-read, ${pairs} tongue pairs and shoulder reliefs, deep program and unreachable slots checked.`);

@@ -32,14 +32,14 @@ def verify(page, download):
         d = report['dossier']
         assert d['resistance']['status'] == expected
         rows = {r['id']:r for r in d['resistance']['rows']}
-        assert isclose(rows['connection']['demand'], 3.07425)
+        assert isclose(rows['connection']['demand'], 3.0675)
         assert len(rows) == sheet.locator('tbody tr').count()
         assert rows['bending']['status'] == expected
         if name != 'clt':
             continue
         assert d['escape']['capacity'] == 36 and d['escape']['status'] == 'pass'
-        assert isclose(rows['bearing-pressure']['demand'], 3.07425 * 1000 / 1600)
-        assert isclose(rows['fastener-shear']['demand'], 3.07425 * .55)
+        assert isclose(rows['bearing-pressure']['demand'], 3.0675 * 1000 / 1600)
+        assert isclose(rows['fastener-shear']['demand'], 3.0675 * .55)
         assert sheet.locator('[data-id="fastener-group"]').is_visible()
         if output:
             pdf = page.pdf(prefer_css_page_size=True, print_background=True)

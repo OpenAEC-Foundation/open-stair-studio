@@ -103,6 +103,7 @@ export function profileTimberTread(tread,stair) {
     return column.heights.get(height);
   }
   function patch(points,depth) {
+    points=points.filter((p,i)=>key(p)!==key(points[(i+points.length-1)%points.length]));
     if(points.length<3) return;
     const area=points.slice(2).reduce((v,p,i)=>v+orient(points[0],points[i+1],p),0);
     if(area<=1e-16) return;

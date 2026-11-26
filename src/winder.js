@@ -56,7 +56,7 @@ function makeRoute(stair, d) {
   const route = { radius: d.radius, angle: d.angle, start, end };
   // One physical facet per station in the bend. These are also the edges in
   // the part drawing and the IFC profile. No independent arc approximation.
-  const extension = d.clearWidth + going + Number(stair.nosing);
+  const extension = d.clearWidth + going + Math.abs(Number(stair.nosing)||0);
   const stations = [-extension, ...Array.from({ length: d.turnSteps + 1 }, (_, i) => start + i * going), d.totalRun + extension];
   const square = (stair.outerShape ?? 'square') === 'square';
   const corners = square ? Array.from({ length: Math.round(d.angle/quarter) }, (_, i) => start + (i + .5) * quarter * d.radius) : [];
@@ -121,15 +121,13 @@ function makeCuts(stair, d) {
   const { route, stations, sides, section } = makeRoute(stair, d);
   const fronts = [], backs = [];
   for (let i = 0; i <= d.treadCount; i++) {
-    const front = section(i * stair.going);
+    const front = section(i * stair.going - Number(stair.nosing||0));
     front.hits = sides.map((rail,j) => cutRail(rail, stations[j], front));
     fronts.push(front);
     if (i === 0) continue;
-    // The upper board overlaps the board below by a constant nosing normal
-    // to the upper board's front edge. Zero nosing gives exactly shared edges.
-    const back = { ...front, at: add(front.at, front.forward, stair.nosing) };
-    back.hits = sides.map((rail,j) => cutRail(rail, stations[j], back));
-    backs.push(back);
+    // The nose setting translates every tread boundary along the route. The
+    // trailing boundary remains the next tread's leading boundary.
+    backs.push(front);
   }
   for (let i = 0; i < d.treadCount; i++) {
     for (let side = 0; side < 2; side++) {
@@ -142,7 +140,7 @@ function makeCuts(stair, d) {
 
 function basicIssues(stair, d) {
   if (![stair.width, stair.floorHeight, stair.going, stair.treadThickness, stair.stringerDepth, stair.stringerThickness].every(x => Number.isFinite(x) && x > 0)
-    || !Number.isFinite(stair.nosing) || stair.nosing < 0 || !Number.isInteger(stair.risers) || stair.risers < 2 || stair.risers > 80) return ['Vul positieve trap- en houtmaten en een geldig aantal optredes in.'];
+    || !Number.isFinite(stair.nosing) || stair.nosing < -60 || stair.nosing > 100 || !Number.isInteger(stair.risers) || stair.risers < 2 || stair.risers > 80) return ['Vul geldige trap- en houtmaten en een geldige neuspositie in.'];
   if (stair.turnDirection && !['left','right'].includes(stair.turnDirection)) return ['Kies linksom of rechtsom.'];
   if (stair.outerShape && !['square','faceted'].includes(stair.outerShape)) return ['Kies een haakse of een gefacetteerde buitenzijde.'];
   if (!Number.isInteger(d.perQuarter) || d.perQuarter < 2 || d.perQuarter > 8) return ['Kies twee tot acht boogtreden per kwartslag.'];
@@ -283,7 +281,7 @@ export function generateWinderGeometry(stair, family, options) {
         }
         return distance;
       };
-      const center = reflect(routePoint((i + .5) * stair.going, 0, cuts.route));
+      const center = reflect(routePoint((i + .5) * stair.going - Number(stair.nosing||0), 0, cuts.route));
       const widths = points.map(p => p.x), heights = points.map(p => p.y);
       const isWinder = Math.abs(front.angle - next.angle) > epsilon || points.length > 4;
       const goingContour = polygon(...between(next));

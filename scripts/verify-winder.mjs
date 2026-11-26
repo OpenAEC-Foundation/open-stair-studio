@@ -72,11 +72,11 @@ for (const type of ['quarter_winder', 'half_winder']) {
     // positive inside radius. Other cases include 0, 1 and 5 straight steps.
     const width = windersPerQuarter === 2 ? 580 : 900;
     for (const straight of [0,1,5]) for (const entrySteps of new Set([-1,0,straight])) {
-      for (const outerShape of ['square','faceted']) for (const nosing of [0,25,100]) {
+      for (const outerShape of ['square','faceted']) for (const nosing of [-25,0,25,100]) {
         const stair = { ...base, type, windersPerQuarter, entrySteps, outerShape, width, nosing, risers: 1 + turnSteps + straight };
         const issues = winderIssues(stair);
         if (issues.length) {
-          assert(nosing > 0 && windersPerQuarter <= 3, issues.join(' '));
+          assert(nosing !== 0 && windersPerQuarter <= 3, issues.join(' '));
           continue;
         }
         const g = generateWinderGeometry(stair);
@@ -93,8 +93,8 @@ for (const type of ['quarter_winder', 'half_winder']) {
         close(g.blankVolume,mirror.blankVolume,'mirrored blank allowance');
         const area = g.treads.reduce((sum,t) => sum + t.area,0);
         const coverage = exactSectorArea(stair,g.dimensions);
-        if (nosing===0) close(area,coverage,'gap-free nominal footprint',1e-5);
-        else assert(area > coverage,'overlap under the next nosing adds material');
+        if(nosing===0) close(area,coverage,'nominal tread footprint',1e-5);
+        else assert(area>0,'translated tread footprint has positive area');
         for (let i=0; i<g.treads.length; i++) {
           const t = g.treads[i], reflected = mirror.treads[i], part = g.parts[i];
           verifySimple(t.points);
