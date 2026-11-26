@@ -45,6 +45,7 @@ function setupBeam(beam) {
   // Use the extents of all eight vertices, including the opposite mitre.
   // This datum can lie outside the sawn face, but always lies on its plane.
   const min = axis => Math.min(...v.map(p => dot(sub(p,start),axis)));
+  const max = axis => Math.max(...v.map(p => dot(sub(p,start),axis)));
   const origin = add(add(start,xAxis,min(xAxis)),yAxis,min(yAxis));
   const frame = {origin,xAxis,yAxis,zAxis};
   const outline = ccw([v[0],v[1],v[5],v[4]].map(p => flatten(frame,p)));
@@ -65,7 +66,7 @@ function setupBeam(beam) {
   }));
   return {
     job: {id:beam.id,side:beam.side>0?'left':'right',face:'inside',flightIndex:beam.flightIndex,
-      length:beam.length,width:beam.width,thickness:beam.thickness,outline,frame,stockPlanes:localPlanes,pockets:[],issues:[]},
+      length:max(xAxis)-min(xAxis),width:max(yAxis)-min(yAxis),thickness:beam.thickness,outline,frame,stockPlanes:localPlanes,pockets:[],issues:[]},
     along,start,planes
   };
 }

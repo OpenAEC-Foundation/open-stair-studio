@@ -40,23 +40,13 @@ function verifyLanding(stair, model) {
 }
 
 function verifyBeam(beam, model, stair) {
-  const { origin, axis, sideAxis, down } = beam.frame;
+  const { origin } = beam.frame;
   const flight = model.flights[beam.flightIndex];
   const sideOffset = flight.direction.x * (origin.y - flight.origin.y)
     - flight.direction.y * (origin.x - flight.origin.x);
   assert.ok(sideOffset * (beam.id.endsWith('-L') ? 1 : -1) > 0, 'left/right viewed in ascending direction');
-  const corners = [];
-  for (const along of [0, beam.length]) {
-    for (const across of [-beam.thickness / 2, beam.thickness / 2]) {
-      for (const depth of [-beam.width / 2, beam.width / 2]) {
-        corners.push({
-          x: origin.x + axis.x * along + sideAxis.x * across + down.x * depth,
-          y: origin.y + axis.y * along + sideAxis.y * across + down.y * depth,
-          z: origin.z + axis.z * along + down.z * depth
-        });
-      }
-    }
-  }
+  const corners = beam.vertices;
+  assert.equal(corners.length, 8, 'plumb-ended stringer has eight vertices');
   for (const key of ['x', 'y']) {
     const [lo, hi] = bounds(corners, key);
     const [loPlan, hiPlan] = bounds(beam.points, key);
@@ -64,6 +54,13 @@ function verifyBeam(beam, model, stair) {
     near(hiPlan, hi, 'stringer plan maximum');
   }
   near(beam.length, (flight.treadCount+(flight.index>0?1:0)) * Math.hypot(stair.going, model.dimensions.rise), 'stringer pitch length');
+  near(corners[0].x, corners[4].x, 'vertical lower cut x');
+  near(corners[0].y, corners[4].y, 'vertical lower cut y');
+  near(corners[1].x, corners[5].x, 'vertical upper cut x');
+  near(corners[1].y, corners[5].y, 'vertical upper cut y');
+  near(corners[4].z, flight.index ? flight.firstRiser * model.dimensions.rise - stair.landingThickness : 0,
+    'lower cut bears on floor or landing');
+  assert.ok(beam.blankVolume >= beam.volume, 'sawn blank covers finished stringer');
   near(Math.max(...corners.map(p => p.z)),
     (flight.firstRiser + flight.risers) * model.dimensions.rise, 'stringer top landing elevation');
 }
@@ -85,7 +82,9 @@ for (const family of stairFamilies.filter(family => !family.winder)) {
       for (const beam of model.stringers) verifyBeam(beam, model, stair);
       near(model.parts[0].width, stair.width - 2 * stair.stringerThickness, 'parts list clear tread width');
       for (const part of model.parts) {
-        near(part.volume, part.length * part.width * part.thickness * part.quantity / 1e9, part.id);
+        if (model.stringers.some(beam => beam.id === part.id)) {
+          assert.ok(part.volume <= part.length * part.width * part.thickness / 1e9, 'stringer is trimmed from its blank');
+        } else near(part.volume, part.length * part.width * part.thickness * part.quantity / 1e9, part.id);
       }
       assert.ok(model.isoFaces.every(face => !/NaN|Infinity/.test(face.points)), 'finite projected faces');
       const tops = model.isoFaces.filter(face => face.type === 'top');
@@ -105,3 +104,20 @@ for (const family of stairFamilies.filter(family => !family.winder)) {
   }
 }
 console.log(`Verified ${count} stair layouts, landing interfaces, beam envelopes, quantities and section endpoints.`);
+
+for (const type of ['straight','quarter_turn','landing','half_turn']) {
+  for (const turnDirection of ['left','right']) for (const nosing of [-25,0,25]) {
+    const stair={...starterProject.stair,type,turnDirection,nosing};
+    const model=generateStairGeometry(stair);
+    for (const beam of model.stringers) {
+      const flight=model.flights[beam.flightIndex];
+      const station=p=>(p.x-flight.origin.x)*flight.direction.x+(p.y-flight.origin.y)*flight.direction.y;
+      near(station(beam.vertices[0]),-(flight.index>0?stair.going:0)-nosing,'lower plumb cut follows nose');
+      near(station(beam.vertices[1]),flight.treadCount*stair.going-nosing,'upper plumb cut follows nose');
+      near(station(beam.vertices[4]),station(beam.vertices[0]),'lower edge has no projecting tip');
+      near(station(beam.vertices[5]),station(beam.vertices[1]),'upper edge has no projecting tip');
+      assert.equal(beam.meshFaces.length,6,'closed production and BIM solid');
+    }
+  }
+}
+console.log('Vertical stringer ends checked for four families, both turning hands and three nose positions.');

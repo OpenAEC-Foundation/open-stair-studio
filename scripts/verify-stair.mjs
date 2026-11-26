@@ -100,7 +100,8 @@ function verifyIfcValues(api, modelId, model, geometry) {
       if (windingType) assert.equal(component.TreadLength, null, 'winding treads have variable going');
     }
     const [shape] = line(component.Representation).Representations.map(line);
-    assert.equal(shape.RepresentationType.value, windingType ? 'SolidModel' : 'SweptSolid');
+    assert.equal(shape.RepresentationType.value,
+      shape.Items.some(item => line(item).type === IFC.IFCFACETEDBREP) ? 'SolidModel' : 'SweptSolid');
     for (const solid of shape.Items.map(line)) {
       if (solid.type === IFC.IFCFACETEDBREP) {
         const shell = inspectShell(solid, line);

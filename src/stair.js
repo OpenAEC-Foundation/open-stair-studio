@@ -33,7 +33,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.11',
+  version: '0.13.12',
   stairEnabled: true,
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
@@ -181,8 +181,8 @@ export function generateStairGeometry(stair, options) {
     const beamRise = (flight.treadCount+entry) * dimensions.rise;
     const length = Math.hypot(run, beamRise);
     const depth = Number(stair.stringerDepth) || 280;
-    // Rectangular stock with square end cuts. The top edge follows the pitch
-    // from the first tread elevation to the elevation of the next floor/landing.
+    // The visible ends are plumb cuts at the tread/landing interfaces. A
+    // square cut normal to the pitch leaves a projecting tip at either end.
     const axis = length > 0
       ? { x: flight.direction.x * run / length, y: flight.direction.y * run / length, z: beamRise / length }
       : { ...flight.direction, z: 0 };
@@ -195,10 +195,17 @@ export function generateStairGeometry(stair, options) {
       const beamStart = add(add(flight.origin,scale(flight.direction,-entry*going)), scale(normal, side * (width / 2 - stringerThickness / 2)));
       const origin = { ...add(beamStart, scale(down, depth / 2)), z: (flight.firstRiser + 1-entry) * dimensions.rise + down.z * depth / 2 };
       const frame = { origin, axis, sideAxis: { ...normal, z: 0 }, down };
-      // The lower edge projects further along the run than the upper edge.
-      const projectedRun = run + axis.z * depth;
-      const center = add(beamStart, scale(flight.direction, projectedRun / 2));
-      const halfRun = scale(flight.direction, projectedRun / 2);
+      const startStation = -entry * going - (Number(stair.nosing) || 0);
+      const endStation = flight.treadCount * going - (Number(stair.nosing) || 0);
+      const topStart = (flight.firstRiser + 1 - entry) * dimensions.rise;
+      const topEnd = (flight.firstRiser + flight.risers) * dimensions.rise;
+      const verticalDepth = depth * length / run;
+      const support = entry ? flight.firstRiser * dimensions.rise - (Number(stair.landingThickness) || thickness) : 0;
+      const bottomStart = Math.max(topStart - verticalDepth, support);
+      const bottomEnd = topEnd - verticalDepth;
+      const center = add(add(flight.origin, scale(flight.direction, (startStation + endStation) / 2)),
+        scale(normal, side * (width / 2 - stringerThickness / 2)));
+      const halfRun = scale(flight.direction, (endStation - startStation) / 2);
       const halfWidth = scale(normal, stringerThickness / 2);
       const points = [
         add(add(center, scale(halfRun, -1)), scale(halfWidth, -1)),
@@ -206,9 +213,26 @@ export function generateStairGeometry(stair, options) {
         add(add(center, halfRun), halfWidth),
         add(add(center, scale(halfRun, -1)), halfWidth)
       ];
+      const world = (station, lateral, z) => ({
+        ...add(add(flight.origin, scale(flight.direction, station)), scale(normal, lateral)), z
+      });
+      const inner = side * (width / 2 - stringerThickness);
+      const outer = side * width / 2;
+      const vertices = [
+        world(startStation, inner, topStart), world(endStation, inner, topEnd),
+        world(endStation, outer, topEnd), world(startStation, outer, topStart),
+        world(startStation, inner, bottomStart), world(endStation, inner, bottomEnd),
+        world(endStation, outer, bottomEnd), world(startStation, outer, bottomStart)
+      ];
+      const faces = [[0,1,2,3],[7,6,5,4],[4,5,1,0],[5,6,2,1],
+        [6,7,3,2],[7,4,0,3]].map(face => side > 0 ? face : face.toReversed());
+      const meshFaces = faces.map(face => face.map(index => vertices[index]));
+      const sectionArea = (endStation - startStation) *
+        ((topStart - bottomStart) + (topEnd - bottomEnd)) / 2;
       stringers.push({ id: `${stair.mark}-WG${flight.index + 1}-${side > 0 ? 'L' : 'R'}`,
-        flightIndex: flight.index, side, frame, length,
-        width: depth, thickness: stringerThickness, volume: length * depth * stringerThickness / 1e9,
+        flightIndex: flight.index, side, frame, length, vertices, faces, meshFaces,
+        width: depth, thickness: stringerThickness, volume: sectionArea * stringerThickness / 1e9,
+        blankVolume: length * depth * stringerThickness / 1e9,
         points, svgPoints: pointString(points) });
     }
   }
@@ -254,8 +278,10 @@ export function generateStairGeometry(stair, options) {
     }))
   ];
   const volume = parts.reduce((sum, part) => sum + part.volume, 0);
+  const blankVolume = volume + stringers.reduce((sum, beam) => sum +
+    Math.max(0, (beam.blankVolume ?? beam.volume) - beam.volume), 0);
   return { dimensions, flights: dimensions.flights, treads, stringers, landings,
-    landingFrame, landingJoints, landingFasteners, planBox, footprint, isoFaces, parts, volume };
+    landingFrame, landingJoints, landingFasteners, planBox, footprint, isoFaces, parts, volume, blankVolume };
 }
 
 export function calculateEstimate(geometry, estimate = starterProject.estimate, cncAllowance = 0) {

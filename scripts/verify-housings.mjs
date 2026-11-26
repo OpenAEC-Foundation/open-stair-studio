@@ -13,7 +13,7 @@ const area=p=>Math.abs(p.reduce((v,a,i)=>{const b=p[(i+1)%p.length];return v+a.x
 const cross2=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
 
 function insideStock(beam,p) {
-  if (beam.frame) {
+  if (!beam.vertices) {
     // Independent projection onto the original gross prism.
     const {origin,axis,sideAxis,down}=beam.frame, d=sub(p,origin);
     assert(dot(d,axis)>=-eps && dot(d,axis)<=beam.length+eps);

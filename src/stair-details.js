@@ -80,7 +80,7 @@ function railParts(stair,geometry,side) {
   const grouped=geometry.flights.map(f=>geometry.stringers.filter(b=>b.flightIndex===f.index&&b.side===side));
   const railingEdge=beam=>{
     const [a,b]=topEdge(beam);
-    if(!beam.vertices&&beam.flightIndex>0){
+    if(beam.frame&&beam.flightIndex>0){
       const direction=geometry.flights[beam.flightIndex].direction;
       return [{x:a.x+direction.x*stair.going,y:a.y+direction.y*stair.going,z:a.z+geometry.dimensions.rise},b];
     }
