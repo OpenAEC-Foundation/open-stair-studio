@@ -2,7 +2,7 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
-## Nieuw in 0.13.6
+## Nieuw in 0.13.7
 
 - De ruwplank van een schuin stootbord bevat nu ook de benodigde extra lengte voor de zaaghoeken. De calculatie gebruikt die gecorrigeerde ruwmaat.
 

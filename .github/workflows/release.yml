@@ -26,6 +26,9 @@ jobs:
         shell: pwsh
         run: |
           node scripts/check-release-version.mjs '${{ github.ref_name }}'
+      - name: Resolve locked Rust dependencies
+        shell: pwsh
+        run: cargo metadata --locked --format-version 1 | Out-Null
       - name: Install dependencies
         run: npm ci
       - name: Verify geometry, calculations and IFC
