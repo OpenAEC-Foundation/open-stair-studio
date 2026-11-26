@@ -17,7 +17,7 @@ const ranges = {
   originX: [-1000000000, 1000000000], originY: [-1000000000, 1000000000], originZ: [-1000000000, 1000000000],
   originRotationDeg: [-360, 360],
   windersPerQuarter: [2, 8], entrySteps: [-1, 39],
-  landingLength: [300, 5000], landingRiser: [0, 39], landingThickness: [20, 300], stringerThickness: [20, 150], stringerDepth: [100, 1000],
+  landingLength: [300, 5000], landingRiser: [0, 39], landingThickness: [20, 300], stringerThickness: [20, 150], stringerDepth: [100, 1000], stringerOverhang:[0,60],
   landingFrameWidth: [40, 150], landingFrameDepth: [80, 300],
   landingScrewsPerJoint: [0, 4], landingScrewDiameter: [5, 12], landingScrewLength: [40, 250],
   landingScrewShearRd: [0, 1000], fastenerUnitPrice: [0, 1000],
@@ -31,7 +31,7 @@ const labels = {
   originX: 'Projectnulpunt X', originY: 'Projectnulpunt Y', originZ: 'Projectnulpunt Z',
   originRotationDeg: 'Rotatie projectassen',
   windersPerQuarter: 'Treden per kwartslag', entrySteps: 'Treden vóór de boog',
-  landingLength: 'Bordeslengte', landingRiser:'Optrede op bordes', landingThickness: 'Bordesdikte', stringerThickness: 'Wangdikte', stringerDepth: 'Wanghoogte',
+  landingLength: 'Bordeslengte', landingRiser:'Optrede op bordes', landingThickness: 'Bordesdikte', stringerThickness: 'Wangdikte', stringerDepth: 'Wanghoogte', stringerOverhang:'Overstek buiten keepboom',
   landingFrameWidth: 'Bordesliggerbreedte', landingFrameDepth: 'Bordesliggerhoogte',
   landingScrewsPerJoint: 'Schroeven per stuiknaad', landingScrewDiameter: 'Schroefdiameter', landingScrewLength: 'Schroeflengte',
   landingScrewShearRd: 'Opgegeven schuifweerstand schroef', fastenerUnitPrice: 'Schroefprijs',
@@ -61,6 +61,7 @@ function readField(section, key, value) {
   if (section==='stair' && key==='wellatType' && !['none','chamfered'].includes(value)) throw new Error('Onbekende wellat.');
   if (section==='stair' && key==='railSide' && !['none','left','right','both'].includes(value)) throw new Error('Kies de zijde van de leuning.');
   if (section==='stair' && key==='riserBoards' && !['none','closed'].includes(value)) throw new Error('Kies open treden of stootborden.');
+  if (section==='stair' && ['stringerLeft','stringerRight'].includes(key) && !['housed','cut'].includes(value)) throw new Error('Kies een ingekroosde boom of een keepboom.');
   if (section === 'joinery' && key === 'type' && !['none', 'housed'].includes(value)) throw new Error('Onbekende tredeverbinding.');
   if (key === 'turnDirection' && !['left', 'right'].includes(value)) throw new Error('Kies linksom of rechtsom.');
   if (key === 'outerShape' && !['square', 'faceted'].includes(value)) throw new Error('Kies een haakse of gefacetteerde buitenwang.');
@@ -143,9 +144,12 @@ export function startSession(model, saved = true) {
 export function editSession(session, section, key, value) {
   if (Object.is(session.model[section][key], value)) return session;
   const model = { ...session.model, [section]: { ...session.model[section], [key]: value } };
+  if(section==='stair'&&key==='type'&&['quarter_winder','half_winder'].includes(value)){
+    model.stair.stringerLeft='housed';model.stair.stringerRight='housed';
+  }
   // Surveyed widths refer to a particular stair layout. Undo restores both
   // the geometry and the measurements for that layout together.
-  if (section === 'stair' && ['width', 'stringerThickness', 'type', 'turnDirection', 'outerShape', 'laneGap', 'going', 'risers', 'windersPerQuarter', 'entrySteps', 'nosing', 'landingLength','landingRiser'].includes(key)) {
+  if (section === 'stair' && ['width', 'stringerThickness', 'stringerLeft','stringerRight','stringerOverhang','type', 'turnDirection', 'outerShape', 'laneGap', 'going', 'risers', 'windersPerQuarter', 'entrySteps', 'nosing', 'landingLength','landingRiser'].includes(key)) {
     model.engineering = { ...model.engineering, escapeWinderWidth: null };
     if (['type', 'width', 'stringerThickness'].includes(key)) model.engineering.escapeWidth = null;
   }

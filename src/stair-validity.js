@@ -34,6 +34,8 @@ export function geometryErrors(stair, d, system='timber') {
   if (Number(stair.width) <= 2 * Number(stair.stringerThickness)) {
     add('Geen ruimte voor de treden', 'De buitenwerkse breedte moet groter zijn dan de som van beide trapboomdiktes.');
   }
+  if(isWinder(stair.type)&&(stair.stringerLeft==='cut'||stair.stringerRight==='cut'))
+    add('Keepboom bij verdreven treden','De keepverdeling van een verdreven trede vraagt een afzonderlijke raildoorsnede. Kies voor deze trap twee ingekroosde segmentbomen.');
   if (d.flightCount > 1 && Number(stair.landingLength) < Number(stair.width)) {
     add('Bordeslengte te klein voor deze trapfamilie', 'Voor dit model moet de bordeslengte minstens gelijk zijn aan de buitenwerkse trapbreedte.');
   }

@@ -4,6 +4,7 @@ import { detailDefaults } from './stair-details.js';
 import { timberDefaults } from './timber-settings.js';
 import { buildStairViews } from './stair-views.js';
 import { buildLandingFrame } from './landing-frame.js';
+import { makeCutStringer } from './cut-stringer.js';
 import { defaultCam } from './housing-cam.js';
 import { defaultTreadCam } from './tread-cam.js';
 import { defaultEngineering } from './engineering.js';
@@ -32,7 +33,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.2',
+  version: '0.13.3',
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
   engineering: { ...defaultEngineering },
@@ -56,6 +57,7 @@ export const starterProject = {
     laneGap: 100, treadThickness: 40,
     windersPerQuarter: 4, turnDirection: 'left', entrySteps: -1, outerShape: 'square',
     stringerDepth: 280, stringerThickness: 50,
+    stringerLeft: 'housed', stringerRight: 'housed', stringerOverhang: 20,
     stringer: 'Prismatische boom · concept', finish: 'Natuur geolied'
   },
   status: 'concept', units: 'mm'
@@ -126,7 +128,8 @@ export function deriveStair(stair) {
   return {
     family, risers, treadCount, flightCount: flights.length,
     flightRisers: flights.map(flight => flight.risers), flightHeights,
-    rise, totalRun, landingTravel, pitch: Math.atan2(rise, going) * 180 / Math.PI, flights
+    rise, totalRun, landingTravel, clearWidth:width-2*Number(stair.stringerThickness),
+    pitch: Math.atan2(rise, going) * 180 / Math.PI, flights
   };
 }
 
@@ -139,7 +142,12 @@ export function generateStairGeometry(stair, options) {
   const laneGap = Math.max(0, Number(stair.laneGap) || 0);
   const thickness = Math.max(10, Number(stair.treadThickness) || 40);
   const stringerThickness = Math.max(20, Number(stair.stringerThickness) || 50);
-  const treadWidth = Math.max(1, width - 2 * stringerThickness);
+  const cutLeft=stair.stringerLeft==='cut', cutRight=stair.stringerRight==='cut';
+  const overhang=Math.max(0,Number(stair.stringerOverhang)||0);
+  const leftEdge=cutLeft?width/2+overhang:width/2-stringerThickness;
+  const rightEdge=cutRight?-width/2-overhang:-width/2+stringerThickness;
+  const treadWidth=Math.max(1,leftEdge-rightEdge);
+  const treadOffset=(leftEdge+rightEdge)/2;
   const treads = [];
   const stringers = [];
   const landings = [];
@@ -149,7 +157,7 @@ export function generateStairGeometry(stair, options) {
     for (let step = 0; step < flight.treadCount; step++) {
       const nose = Math.max(0, Number(stair.nosing) || 0);
       const physicalRun = going + nose;
-      const center = add(flight.origin, scale(flight.direction, (step + 0.5) * going - nose / 2));
+      const center = add(add(flight.origin, scale(flight.direction, (step + 0.5) * going - nose / 2)),scale(normal,treadOffset));
       const halfRun = scale(flight.direction, physicalRun / 2);
       const halfWidth = scale(normal, treadWidth / 2);
       const level = flight.firstRiser + step + 1;
@@ -179,6 +187,10 @@ export function generateStairGeometry(stair, options) {
       : { ...flight.direction, z: 0 };
     const down = { x: flight.direction.x * axis.z, y: flight.direction.y * axis.z, z: -Math.hypot(axis.x, axis.y) };
     for (const side of [-1, 1]) {
+      if ((side>0?cutLeft:cutRight)) {
+        stringers.push(makeCutStringer(stair,flight,side,normal,dimensions.rise));
+        continue;
+      }
       const beamStart = add(add(flight.origin,scale(flight.direction,-entry*going)), scale(normal, side * (width / 2 - stringerThickness / 2)));
       const origin = { ...add(beamStart, scale(down, depth / 2)), z: (flight.firstRiser + 1-entry) * dimensions.rise + down.z * depth / 2 };
       const frame = { origin, axis, sideAxis: { ...normal, z: 0 }, down };
@@ -233,7 +245,7 @@ export function generateStairGeometry(stair, options) {
     ...landingFrame.map(member => ({id:member.id,name:member.name,kind:member.kind,quantity:1,
       length:member.length,width:member.width,thickness:member.thickness,volume:member.volume})),
     ...stringers.map(beam => ({
-      id: beam.id, name: `Trapboom ${beam.side > 0 ? 'links' : 'rechts'} · ${dimensions.flights[beam.flightIndex].label}`,
+      id: beam.id, name: beam.name??`Ingekroosde boom ${beam.side > 0 ? 'links' : 'rechts'} · ${dimensions.flights[beam.flightIndex].label}`,
       quantity: 1, length: beam.length, width: beam.width, thickness: beam.thickness, volume: beam.volume
     }))
   ];

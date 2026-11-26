@@ -1,3 +1,5 @@
+import {cutStringerJob} from './cut-stringer.js';
+
 // All calculations use model millimetres. The machining Z axis points from
 // the inside face towards the stair. Negative local Z cuts into the stringer.
 const EPS = 1e-7;
@@ -142,7 +144,7 @@ function pocketConflict(one,two,along) {
 export function buildHousings(geometry, input = {}) {
   const settings={...defaultHousingSettings,...input};
   const validBeam=beam => [beam.length,beam.width,beam.thickness].every(value=>Number.isFinite(value)&&value>EPS);
-  const setups=geometry.stringers.filter(validBeam).map(setupBeam);
+  const setups=geometry.stringers.filter(validBeam).map(beam=>beam.profile==='cut'?{job:cutStringerJob(beam)}:setupBeam(beam));
   const beams=setups.map(s=>s.job);
   const issues=[];
   const issue=(message,code,jobs,treadId) => {
@@ -160,12 +162,12 @@ export function buildHousings(geometry, input = {}) {
     issue('Diepte moet positief zijn. Speling en schoudermaat moeten geldige, niet-negatieve millimetermaten zijn.','settings',beams);
     return {settings,beams,treads,issues};
   }
-  for (const job of beams) if (settings.depth >= job.thickness-EPS) {
+  for (const job of beams) if (job.profile!=='cut'&&settings.depth >= job.thickness-EPS) {
     issue('De ingestelde diepte laat geen hout achter het huis in '+job.id+'.','through', [job]);
   }
   for (const tread of geometry.treads) {
     const points=[],tongues=[];
-    const relevant=setups.filter(s=>s.job.flightIndex===tread.flightIndex);
+    const relevant=setups.filter(s=>s.job.flightIndex===tread.flightIndex&&s.job.profile!=='cut');
     for (let i=0;i<tread.points.length;i++) {
       const a=tread.points[i], b=tread.points[(i+1)%tread.points.length];
       points.push(a);
@@ -184,8 +186,8 @@ export function buildHousings(geometry, input = {}) {
       }
     }
     const profile=compact(points);
-    if (new Set(tongues.map(t=>t.side)).size!==2) {
-      issue('Onvoldoende ruimte voor een insteeklip aan beide zijden van '+tread.id+'. Pas de trap- of verbindingsmaten aan.','missing-support',relevant.map(s=>s.job),tread.id);
+    if (new Set(tongues.map(t=>t.side)).size!==new Set(relevant.map(s=>s.job.side)).size) {
+      issue('Onvoldoende ruimte voor een insteeklip op de ingekroosde boom van '+tread.id+'. Pas de trap- of verbindingsmaten aan.','missing-support',relevant.map(s=>s.job),tread.id);
     }
     if (!simple(profile)) issue('Insteeklippen kruisen elkaar op '+tread.id+'.','crossed-tongues',relevant.map(s=>s.job),tread.id);
     const boardArea=area(profile);

@@ -70,7 +70,7 @@ function verifyIfcValues(api, modelId, model, geometry) {
   assert.deepEqual(defines.RelatedObjects.map(item => item.value), [stair.expressID]);
   const properties = line(defines.RelatingPropertyDefinition).HasProperties.map(line);
   if (windingType) {
-    assert.equal(properties.find(item => item.Name.value === 'StringerType').NominalValue.value, 'Gesegmenteerde trapboom met verstek');
+    assert.equal(properties.find(item => item.Name.value === 'StringerType').NominalValue.value, 'Gesegmenteerde ingekroosde boom met verstek');
     assert.equal(properties.find(item => item.Name.value === 'TurnDirection').NominalValue.value, model.stair.turnDirection);
     assert.equal(properties.find(item => item.Name.value === 'OuterShape').NominalValue.value, model.stair.outerShape);
     assert.equal(properties.find(item => item.Name.value === 'WindersPerQuarter').NominalValue.value, model.stair.windersPerQuarter);

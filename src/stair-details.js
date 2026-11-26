@@ -36,6 +36,7 @@ function sweptHandrail(path, radius) {
 }
 
 function topEdge(stringer) {
+  if (stringer.topEdge) return stringer.topEdge;
   if (stringer.vertices) {
     const [a,b,c,d]=stringer.vertices;
     return [midpoint(a,d),midpoint(b,c)];

@@ -1,6 +1,7 @@
 import { buildHousings } from './housings.js';
 import { buildWinderSchedule, treadPart } from './winder-parts.js';
 import { profileTimberTread } from './timber-tread-profile.js';
+import {cutStringerJob} from './cut-stringer.js';
 
 // Older straight-flight projects keep their grouped cutting list. Their individual
 // pieces can still be opened in the workshop and machined without a housed joint.
@@ -33,8 +34,10 @@ function pocketVolume(pocket) {
 export function buildWorkshop(geometry, model) {
   if (model.engineering && model.engineering.structureType !== 'timber') return geometry;
   const housed=model.joinery.type!=='none';
-  if(!housed&&!['round','bevel'].includes(model.stair.noseProfile)) return geometry;
-  const housings = housed?buildHousings(geometry, model.joinery):null;
+  const cutBeams=geometry.stringers.filter(beam=>beam.profile==='cut');
+  if(!housed&&!cutBeams.length&&!['round','bevel'].includes(model.stair.noseProfile)) return geometry;
+  const housings = housed?buildHousings(geometry, model.joinery):cutBeams.length?
+    {settings:model.joinery,beams:cutBeams.map(cutStringerJob),treads:geometry.treads,issues:[]}:null;
   const treads = (housings?.treads??geometry.treads).map(tread => ({
     ...profileTimberTread(tread,model.stair),
     goingAtWalkline: tread.goingAtWalkline ?? model.stair.going,

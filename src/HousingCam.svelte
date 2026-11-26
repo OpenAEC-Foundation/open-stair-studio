@@ -3,6 +3,7 @@
     camRanges, compileHousingJob, defaultCam, housingFileStem,
     validateCamField, writeHousingDxf, writeLinuxCnc
   } from './housing-cam.js';
+  import {writeCutStringerDxf} from './cut-stringer.js';
 
   export let geometry;
   export let model;
@@ -56,7 +57,7 @@
     if (!setup) return;
     const stem = housingFileStem(setup,metadata,ext === 'dxf' ? '' : onlyPocketId);
     if (ext === 'dxf') {
-      downloadFile(stem+'.dxf',writeHousingDxf(setup,metadata),'application/dxf');
+      downloadFile(stem+'.dxf',setup.profile==='cut'?writeCutStringerDxf(setup,metadata):writeHousingDxf(setup,metadata),'application/dxf');
     } else if (result.job && ext === 'ngc') {
       downloadFile(stem+'.ngc',writeLinuxCnc(result.job),'text/plain');
     } else if (result.job && ext === 'json') {
@@ -86,7 +87,7 @@
     <div class="setup">
       <label for="cam-beam">Wang op de machine</label>
       <select id="cam-beam" value={setup.id} onchange={e=>selectedBeamId=e.currentTarget.value}>
-        {#each setups as beam}<option value={beam.id}>{beam.id} · {beam.side === 'left' ? 'links' : 'rechts'} · {beam.pockets.length} huizen</option>{/each}
+        {#each setups as beam}<option value={beam.id}>{beam.id} · {beam.side === 'left' ? 'links' : 'rechts'} · {beam.profile==='cut'?'keepboomcontour':beam.pockets.length+' huizen'}</option>{/each}
       </select>
       <dl><dt>Boven</dt><dd>Binnenzijde van de wang</dd><dt>Nulpunt G54</dt><dd>X0 Y0 linksonder in de omhullende ruwe plank, Z0 op het binnenvlak. Positieve X volgt de nerf in de stijgrichting van het lage naar het hoge trapuiteinde. Positieve Z wijst naar de spil.</dd></dl>
     </div>
@@ -136,11 +137,11 @@
         </svg>
       </div>
     {/if}
-    {#if result.problem}<p class="problem" role="status">{result.problem}</p>{/if}
+    {#if setup.profile==='cut'}<p class="problem" role="status">Keepboom: nominale contour als DXF beschikbaar. Een vrijgegeven buitencontourprogramma vergt freesradiuscompensatie, opspanning, voldoende snijlengte en een onderslagdetail.</p>{:else if result.problem}<p class="problem" role="status">{result.problem}</p>{/if}
     <div class="exports">
       <button class="action-btn" disabled={!result.job} onclick={()=>saveFile('ngc')}>LinuxCNC-programma (.ngc)</button>
       <button class="action-btn" disabled={!result.job} onclick={()=>saveFile('json')}>CAM-pakket (.json)</button>
-      <button class="action-btn" disabled={!setup.pockets.length || setup.issues.some(i=>i.level==='error')} onclick={()=>saveFile('dxf')}>Volledige wang-DXF</button>
+      <button class="action-btn" disabled={(!setup.pockets.length&&setup.profile!=='cut') || setup.issues.some(i=>i.level==='error')} onclick={()=>saveFile('dxf')}>Volledige wang-DXF</button>
     </div>
     <p class="setup-note">Stel G54 in met de gemonteerde, centrumsnijdende vlakfrees en zonder gereedschapslengtecorrectie of extra G52/G92-verschuiving. Controleer de voeding, het toerental en de snijlengte voor het hout en de frees. Leg de klemmen buiten de banen en onder de vrijloophoogte. Simuleer het programma met de machine-instellingen en maak een proefstuk.</p>
   {:else}

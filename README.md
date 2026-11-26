@@ -24,6 +24,7 @@ Run `npm run verify` for geometry, material quantities, project recovery, dimens
 ## Working capabilities
 
 - Six timber stair families, including quarter and half winding stairs. Choose turn direction, the number of treads per quarter turn, where the bend starts, and a square or faceted outer stringer.
+- For straight flights and stairs with a landing, choose an ingekroosde boom or an uitgezaagde keepboom independently on the left and right. The keepboom has horizontal tread seats and a sloping underside with a configurable minimum web. Its closed solid enters the 3D view, material estimate and IFC4; Wangbladen exports its nominal 2D DXF contour. The overhang of each tread above a keepboom is adjustable.
 - Shared derived geometry for tread layout, landings, outside stringer envelopes, plan footprint and parts schedule. Trapbreedte is measured outside-to-outside including stringers; usable tread width is derived by subtracting both stringer thicknesses.
 - Editable project identity, stair parameters, timber assumptions, landing and opening context, and a small set of Dutch new-build Bbl dimension profiles.
 - Source-linked geometric prechecks, material calculations and escape capacity checks with explicit assumptions and open inputs.
@@ -54,7 +55,7 @@ Open **Trap ontwerpen → Traptype ontwerpen** to choose a timber, laminated gla
 
 ## Capability boundaries
 
-The three-axis LinuxCNC profile machines solid timber tread outlines and their corresponding stringer housings. Machine travel, fixture clearance, tooling, material and assembly sequence require workshop verification. Handrail joints, landing-joint fabrication, building-model import and IFCX remain open.
+The three-axis LinuxCNC profile machines solid timber tread outlines and their corresponding housed-stringer pockets. Keepboom cutting is a nominal DXF handoff; its external profile is not yet emitted as a verified machine program. Keepbomen in winding flights and their support/underslag engineering remain open. Machine travel, fixture clearance, tooling, material and assembly sequence require workshop verification. Handrail joints, landing-joint fabrication, building-model import and IFCX remain open.
 
 ## Precast reinforcement, lifting and connections
 

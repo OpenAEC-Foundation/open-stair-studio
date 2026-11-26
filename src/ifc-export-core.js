@@ -136,7 +136,10 @@ function writeModel(api, sid, model, geometry) {
       ['NosingProfile', IFC.IFCLABEL, stair.noseProfile==='round'?'Upper quarter round':'Upper 45 degree bevel'],
       ['NosingSize_mm', IFC.IFCLENGTHMEASURE, stair.noseSize]
     ]:[]),
-    ...(separateTreads ? [] : [['StringerType', IFC.IFCLABEL, windingFlight ? 'Gesegmenteerde trapboom met verstek' : stair.stringer]]),
+    ...(separateTreads ? [] : [
+      ['StringerType', IFC.IFCLABEL, windingFlight ? 'Gesegmenteerde ingekroosde boom met verstek' : 'Zijbomen per zijde'],
+      ['StringerLeft', IFC.IFCLABEL, stair.stringerLeft==='cut'?'Uitgezaagde keepboom':'Ingekroosde boom'],
+      ['StringerRight', IFC.IFCLABEL, stair.stringerRight==='cut'?'Uitgezaagde keepboom':'Ingekroosde boom']]),
     ['Revision', IFC.IFCLABEL, model.project.revision],
     ...(!separateTreads && model.joinery?.type === 'housed' ? [
       ['TreadJoint', IFC.IFCLABEL, 'Housed tread with shouldered tongues'],
@@ -270,7 +273,7 @@ function writeModel(api, sid, model, geometry) {
     const parts = [...plates];
     const solids = separateTreads ? [] : treads.map(treadSolid);
     for (const beam of geometry.stringers.filter(item => item.flightIndex === flight.index)) {
-      const solid = windingFlight ? mitredBeamSolid(beam) : slopedBeamSolid(beam);
+      const solid = beam.faces ? mitredBeamSolid(beam) : slopedBeamSolid(beam);
       if (separateTreads) parts.push(reservation(beam.id, 'wang', solid, flightPlacement));
       else solids.push(solid);
     }
@@ -490,7 +493,7 @@ function writeModel(api, sid, model, geometry) {
     const brepCount = count(IFC.IFCFACETEDBREP);
     const solidCount = count(IFC.IFCEXTRUDEDAREASOLID) + brepCount + count(IFC.IFCTRIANGULATEDFACESET);
     const surfaceCount = count(IFC.IFCFACEBASEDSURFACEMODEL);
-    const expectedBreps = (windingFlight ? geometry.stringers.length : 0) + detailParts.length - indexedDetailCount + profiledTreadBrepCount + screwObjects.length;
+    const expectedBreps = geometry.stringers.filter(beam=>!!beam.faces).length + detailParts.length - indexedDetailCount + profiledTreadBrepCount + screwObjects.length;
     const expectedSolids = (surfaceTreads ? 0 : geometry.treads.length) + geometry.landings.length + geometry.stringers.length + detailParts.length + frameObjects.length + screwObjects.length;
     if (schema !== IFC.Schemas.IFC4 || stairCount !== 1 || flightCount !== geometry.flights.length ||
         count(IFC.IFCPLATE) !== (separateTreads ? geometry.treads.length : 0) + detailParts.filter(p=>p.kind==='plate').length ||

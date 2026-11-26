@@ -1,5 +1,6 @@
 <script>
   import { compileHousingJob, defaultCam, housingFileStem, writeHousingDxf } from './housing-cam.js';
+  import {writeCutStringerDxf} from './cut-stringer.js';
 
   export let housings;
   export let selectedBeamId = '';
@@ -48,7 +49,7 @@
     mode = 'detail';
   }
   function exportDxf() {
-    downloadFile(housingFileStem(beam, metadata) + '.dxf', writeHousingDxf(beam, metadata), 'application/dxf');
+    downloadFile(housingFileStem(beam, metadata) + '.dxf', beam.profile==='cut'?writeCutStringerDxf(beam,metadata):writeHousingDxf(beam, metadata), 'application/dxf');
   }
 
   $: beams = housings?.beams ?? [];
@@ -78,7 +79,7 @@
     <div><span class="eyebrow">WERKVOORBEREIDING</span><h1>Wangbladen</h1></div>
     {#if beam}
       <div class="button-row">
-        <button class="action-btn" disabled={!rows.length || beam.issues.some(issue => issue.level === 'error')} onclick={exportDxf}>Wang-DXF</button>
+        <button class="action-btn" disabled={(!rows.length && beam.profile!=='cut') || beam.issues.some(issue => issue.level === 'error')} onclick={exportDxf}>Wang-DXF</button>
         <button class="action-btn" onclick={printSelection}>Afdrukken / PDF</button>
         <button class="action-btn" onclick={printSet}>Alle wangbladen / PDF</button>
         {#if openCam}<button class="action-btn" onclick={() => openCam(beam.id, mode === 'detail' ? active?.pocket.id : '')}>Naar CNC</button>{/if}
@@ -89,7 +90,7 @@
     {#if !embedded}<div class="sheet-controls">
       <label for="housing-beam">Wangdeel</label>
       <select id="housing-beam" value={beam.id} onchange={event => selectBeam(event.currentTarget.value)}>
-        {#each beams as item}<option value={item.id}>{item.id} · {item.side === 'left' ? 'links' : 'rechts'} · {item.pockets.length} infrezingen</option>{/each}
+        {#each beams as item}<option value={item.id}>{item.id} · {item.side === 'left' ? 'links' : 'rechts'} · {item.profile==='cut'?'uitgezaagde keepboom':item.pockets.length+' infrezingen'}</option>{/each}
       </select>
       <div class="sheet-modes">
         <button aria-pressed={mode === 'overzicht'} onclick={showOverview}>Overzicht</button>
@@ -102,7 +103,7 @@
         <div class="stock"><span>Ruwmaat L × B × D</span><b>{mm(beam.length)} × {mm(beam.width)} × {mm(beam.thickness)}</b></div>
       </header>
       {#if mode === 'overzicht' || !active}
-        <div class="view-heading"><h3>Positie van de infrezingen</h3><span>+X → hogere trapzijde</span></div>
+        <div class="view-heading"><h3>{beam.profile==='cut'?'Keepboom · uitgezaagde treden':'Positie van de infrezingen'}</h3><span>+X → hogere trapzijde</span></div>
         <svg viewBox={'0 0 ' + plotWidth + ' ' + plotHeight} class="overview" role="img" aria-label={'Werkplaatstekeningen binnenzijde ' + beam.id}>
           <rect class="blank" x={overview.x(0)} y={overview.y(beam.width)} width={overview.x(beam.length)-overview.x(0)} height={overview.y(0)-overview.y(beam.width)}/>
           <polygon points={overview.polygon(beam.outline)} class="face"/>
@@ -122,7 +123,7 @@
           <text class="axis-text" x={overview.x(0)+30} y={overview.y(0)+4}>X</text>
           <text class="axis-text" x={overview.x(0)-5} y={overview.y(0)-29}>Y</text>
         </svg>
-        <div class="key"><span><i class="stock-key"></i>Ruwe plank</span><span><i class="face-key"></i>Binnenvlak</span><span><i class="cut-key"></i>Nominale infrezing</span></div>
+        <div class="key"><span><i class="stock-key"></i>Ruwe plank</span><span><i class="face-key"></i>{beam.profile==='cut'?'Keepcontour':'Binnenvlak'}</span>{#if beam.profile!=='cut'}<span><i class="cut-key"></i>Nominale infrezing</span>{/if}</div>
         {#if rows.length}
           <table class="coordinates operations">
             <caption>Infrezingen vanaf het binnenvlak</caption>
@@ -139,7 +140,7 @@
             </tbody>
           </table>
         {:else}
-          <p class="instruction">Dit wangdeel bevat geen infrezingen.</p>
+          <p class="instruction">{beam.profile==='cut'?`De treden rusten op de uitgezaagde keep. De minimale rug is ${mm(beam.minWeb)} mm. Gebruik de DXF als nominale contour voor CAM; freesbaan, opspanning en onderslag vragen werkplaatsvalidatie.`:'Dit wangdeel bevat geen infrezingen.'}</p>
         {/if}
       {:else}
         <div class="detail-controls"><label for="housing-pocket">Infrezing</label>
