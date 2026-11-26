@@ -53,7 +53,7 @@ export function buildWinderSchedule(treads, stringers) {
   for (const beam of stringers) {
     parts.push({
       id: beam.id, name: beam.name ?? 'Wangsegment', kind: 'stringer',
-      quantity: 1, length: beam.length, width: beam.width, thickness: beam.thickness,
+      quantity: 1, length: beam.stockLength??beam.length, width: beam.stockWidth??beam.width, thickness: beam.thickness,
       volume: beam.volume, blankVolume: beam.blankVolume ?? beam.volume, pocketCount: beam.pocketCount
     });
   }

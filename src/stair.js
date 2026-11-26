@@ -33,7 +33,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.13',
+  version: '0.13.14',
   stairEnabled: true,
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
@@ -202,7 +202,11 @@ export function generateStairGeometry(stair, options) {
       const verticalDepth = depth * length / run;
       const support = entry ? flight.firstRiser * dimensions.rise - (Number(stair.landingThickness) || thickness) : 0;
       const bottomStart = Math.max(topStart - verticalDepth, support);
-      const bottomEnd = topEnd - verticalDepth;
+      const bottomEnd = Math.max(topEnd - verticalDepth, support);
+      const pitch = (topEnd - topStart) / (endStation - startStation);
+      const knee = Math.max(startStation, Math.min(endStation,
+        startStation + (support - topStart + verticalDepth) / pitch));
+      const hasFoot = knee > startStation + 1e-7 && knee < endStation - 1e-7;
       const center = add(add(flight.origin, scale(flight.direction, (startStation + endStation) / 2)),
         scale(normal, side * (width / 2 - stringerThickness / 2)));
       const halfRun = scale(flight.direction, (endStation - startStation) / 2);
@@ -218,21 +222,43 @@ export function generateStairGeometry(stair, options) {
       });
       const inner = side * (width / 2 - stringerThickness);
       const outer = side * width / 2;
-      const vertices = [
+      const vertices = hasFoot ? [
+        world(startStation, inner, topStart), world(endStation, inner, topEnd),
+        world(endStation, outer, topEnd), world(startStation, outer, topStart),
+        world(startStation, inner, bottomStart), world(knee, inner, support),
+        world(endStation, inner, bottomEnd), world(endStation, outer, bottomEnd),
+        world(knee, outer, support), world(startStation, outer, bottomStart)
+      ] : [
         world(startStation, inner, topStart), world(endStation, inner, topEnd),
         world(endStation, outer, topEnd), world(startStation, outer, topStart),
         world(startStation, inner, bottomStart), world(endStation, inner, bottomEnd),
         world(endStation, outer, bottomEnd), world(startStation, outer, bottomStart)
       ];
-      const faces = [[0,1,2,3],[7,6,5,4],[4,5,1,0],[5,6,2,1],
-        [6,7,3,2],[7,4,0,3]].map(face => side > 0 ? face : face.toReversed());
+      const contour = hasFoot ?
+        [[0,1,2,3],[9,8,5,4],[8,7,6,5],[4,5,6,1,0],
+          [6,7,2,1],[7,8,9,3,2],[9,4,0,3]] :
+        [[0,1,2,3],[7,6,5,4],[4,5,1,0],[5,6,2,1],
+          [6,7,3,2],[7,4,0,3]];
+      const faces = contour.map(face => side > 0 ? face : face.toReversed());
       const meshFaces = faces.map(face => face.map(index => vertices[index]));
-      const sectionArea = (endStation - startStation) *
-        ((topStart - bottomStart) + (topEnd - bottomEnd)) / 2;
+      const stockCoords=vertices.map(p=>{
+        const station=(p.x-flight.origin.x)*flight.direction.x+(p.y-flight.origin.y)*flight.direction.y-startStation;
+        const height=p.z-topStart;
+        return {u:(station*run+height*beamRise)/length,
+          v:(height*run-station*beamRise)/length};
+      });
+      const extent=key=>Math.max(...stockCoords.map(p=>p[key]))-Math.min(...stockCoords.map(p=>p[key]));
+      const stockLength=extent('u'),stockWidth=extent('v');
+      const kneeTop = topStart + (knee - startStation) * pitch;
+      const sectionArea = hasFoot ?
+        (knee - startStation) * ((topStart - bottomStart) + (kneeTop - support)) / 2 +
+          (endStation - knee) * verticalDepth :
+        (endStation - startStation) * ((topStart - bottomStart) + (topEnd - bottomEnd)) / 2;
       stringers.push({ id: `${stair.mark}-WG${flight.index + 1}-${side > 0 ? 'L' : 'R'}`,
         flightIndex: flight.index, side, frame, length, vertices, faces, meshFaces,
+        housingOutline: hasFoot ? [0,1,6,5,4] : [0,1,5,4],
         width: depth, thickness: stringerThickness, volume: sectionArea * stringerThickness / 1e9,
-        blankVolume: length * depth * stringerThickness / 1e9,
+        stockLength,stockWidth,blankVolume: stockLength * stockWidth * stringerThickness / 1e9,
         points, svgPoints: pointString(points) });
     }
   }
@@ -274,7 +300,8 @@ export function generateStairGeometry(stair, options) {
       length:member.length,width:member.width,thickness:member.thickness,volume:member.volume})),
     ...stringers.map(beam => ({
       id: beam.id, name: beam.name??`Ingekroosde boom ${beam.side > 0 ? 'links' : 'rechts'} · ${dimensions.flights[beam.flightIndex].label}`,
-      quantity: 1, length: beam.length, width: beam.width, thickness: beam.thickness, volume: beam.volume
+      quantity: 1, length: beam.stockLength??beam.length, width: beam.stockWidth??beam.width,
+      thickness: beam.thickness, volume: beam.volume
     }))
   ];
   const volume = parts.reduce((sum, part) => sum + part.volume, 0);

@@ -46,7 +46,7 @@ function verifyBeam(beam, model, stair) {
     - flight.direction.y * (origin.x - flight.origin.x);
   assert.ok(sideOffset * (beam.id.endsWith('-L') ? 1 : -1) > 0, 'left/right viewed in ascending direction');
   const corners = beam.vertices;
-  assert.equal(corners.length, 8, 'plumb-ended stringer has eight vertices');
+  assert.ok([8,10].includes(corners.length), 'plumb-ended stringer has a closed sawn section');
   for (const key of ['x', 'y']) {
     const [lo, hi] = bounds(corners, key);
     const [loPlan, hiPlan] = bounds(beam.points, key);
@@ -56,11 +56,20 @@ function verifyBeam(beam, model, stair) {
   near(beam.length, (flight.treadCount+(flight.index>0?1:0)) * Math.hypot(stair.going, model.dimensions.rise), 'stringer pitch length');
   near(corners[0].x, corners[4].x, 'vertical lower cut x');
   near(corners[0].y, corners[4].y, 'vertical lower cut y');
-  near(corners[1].x, corners[5].x, 'vertical upper cut x');
-  near(corners[1].y, corners[5].y, 'vertical upper cut y');
+  const endBottom=corners[corners.length===10?6:5];
+  near(corners[1].x, endBottom.x, 'vertical upper cut x');
+  near(corners[1].y, endBottom.y, 'vertical upper cut y');
   near(corners[4].z, flight.index ? flight.firstRiser * model.dimensions.rise - stair.landingThickness : 0,
     'lower cut bears on floor or landing');
+  if (corners.length === 10) {
+    const station=p=>(p.x-flight.origin.x)*flight.direction.x+(p.y-flight.origin.y)*flight.direction.y;
+    near(corners[5].z,corners[4].z,'level stringer foot at support');
+    near((corners[6].z-corners[5].z)/(station(corners[6])-station(corners[5])),
+      model.dimensions.rise/stair.going,'stringer soffit follows the pitch after its foot');
+  }
   assert.ok(beam.blankVolume >= beam.volume, 'sawn blank covers finished stringer');
+  near(beam.blankVolume,beam.stockLength*beam.stockWidth*beam.thickness/1e9,
+    'actual rough stock envelope');
   near(Math.max(...corners.map(p => p.z)),
     (flight.firstRiser + flight.risers) * model.dimensions.rise, 'stringer top landing elevation');
 }
@@ -115,8 +124,18 @@ for (const type of ['straight','quarter_turn','landing','half_turn']) {
       near(station(beam.vertices[0]),-(flight.index>0?stair.going:0)-nosing,'lower plumb cut follows nose');
       near(station(beam.vertices[1]),flight.treadCount*stair.going-nosing,'upper plumb cut follows nose');
       near(station(beam.vertices[4]),station(beam.vertices[0]),'lower edge has no projecting tip');
-      near(station(beam.vertices[5]),station(beam.vertices[1]),'upper edge has no projecting tip');
-      assert.equal(beam.meshFaces.length,6,'closed production and BIM solid');
+      near(station(beam.vertices[beam.vertices.length===10?6:5]),station(beam.vertices[1]),'upper edge has no projecting tip');
+      assert.ok([6,7].includes(beam.meshFaces.length),'closed production and BIM solid');
+      const soffit=(beam.vertices.length===10?[4,5,6]:[4,5]).map(i=>beam.vertices[i]);
+      for(const tread of model.treads.filter(t=>t.flightIndex===flight.index)) {
+        for(const x of [(tread.step-1)*stair.going-nosing,tread.step*stair.going-nosing]) {
+          const j=Math.max(0,soffit.findIndex((p,i)=>i+1<soffit.length&&x<=station(soffit[i+1])+1e-7));
+          const a=soffit[j],b=soffit[j+1],t=(x-station(a))/(station(b)-station(a));
+          const underside=a.z+t*(b.z-a.z);
+          assert.ok(underside<=tread.elevation-tread.thickness+1e-7,
+            `${beam.id}: tread ${tread.id} projects below the stringer at station ${x}`);
+        }
+      }
     }
   }
 }

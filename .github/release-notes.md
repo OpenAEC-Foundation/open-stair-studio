@@ -2,6 +2,11 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.14
+
+- De onderzijde van ingekroosde trapbomen heeft nu een vlakke oplegvoet aan vloer of bordes en loopt daarna evenwijdig aan de traphelling. Treden steken bij de bordesaansluiting niet meer onder de boom uit.
+- Werkbladen, ruwmaten, calculatie, CNC-opspanning en IFC4 volgen de werkelijke vijfhoekige boomdoorsnede. De controle vergelijkt voor iedere trede beide randen met de onderzijde van de boom, ook links/rechts en met verplaatste neus.
+
 ## Nieuw in 0.13.13
 
 - Stalen rechte trappen kunnen nu een open driehoekige plaatwang met doorlopende voetregel krijgen, zoals bij een korte roostertrap. De opening wordt als echt gat in 3D, massa, onderdelenstaat en IFC4 gemodelleerd.

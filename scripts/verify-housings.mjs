@@ -24,6 +24,16 @@ function insideStock(beam,p) {
   // The winding segment has a triangulated, possibly twisted top and a
   // matching bottom. Locate actual XY in a triangle and interpolate its Z.
   const v=beam.vertices;
+  if (beam.housingOutline) {
+    const center=v.reduce((sum,q)=>({x:sum.x+q.x/v.length,y:sum.y+q.y/v.length,z:sum.z+q.z/v.length}),{x:0,y:0,z:0});
+    for (const face of beam.faces) {
+      const [a,b,c]=face.map(i=>v[i]);
+      const normal=cross(sub(b,a),sub(c,a));
+      const sign=dot(normal,sub(center,a))>0?-1:1;
+      assert(dot(normal,sub(p,a))*sign<=eps*mag(normal),beam.id+' cuts outside actual sawn profile');
+    }
+    return;
+  }
   for (const [i,j,k] of [[0,1,2],[0,2,3]]) {
     const denom=cross2(v[i],v[j],v[k]);
     const w=[cross2(p,v[j],v[k]),cross2(v[i],p,v[k]),cross2(v[i],v[j],p)].map(x=>x/denom);
@@ -44,6 +54,10 @@ function check(stair,settings) {
   const allPockets=new Map();
   for (const job of result.beams) {
     const beam=geometry.stringers.find(b=>b.id===job.id);
+    if(beam.stockLength) {
+      near(job.length,beam.stockLength,'CNC blank length');
+      near(job.width,beam.stockWidth,'CNC blank width');
+    }
     const {xAxis,yAxis,zAxis}=job.frame;
     near(dot(cross(xAxis,yAxis),zAxis),1,'right-handed machine frame');
     for (const axis of [xAxis,yAxis,zAxis]) near(mag(axis),1,'unit setup axis');

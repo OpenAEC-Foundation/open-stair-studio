@@ -42,17 +42,18 @@ function setupBeam(beam) {
   const xAxis = unit(delta);
   const zAxis = { x: beam.side*along.y, y: -beam.side*along.x, z: 0 };
   const yAxis = cross(zAxis,xAxis);
-  // Use the extents of all eight vertices, including the opposite mitre.
+  // Use the extents of the complete sawn section, including a level foot.
   // This datum can lie outside the sawn face, but always lies on its plane.
   const min = axis => Math.min(...v.map(p => dot(sub(p,start),axis)));
   const max = axis => Math.max(...v.map(p => dot(sub(p,start),axis)));
   const origin = add(add(start,xAxis,min(xAxis)),yAxis,min(yAxis));
   const frame = {origin,xAxis,yAxis,zAxis};
-  const outline = ccw([v[0],v[1],v[5],v[4]].map(p => flatten(frame,p)));
+  const outline = ccw((beam.housingOutline??[0,1,5,4]).map(i => v[i]).map(p => flatten(frame,p)));
   const center = mul(v.reduce((a,p) => add(a,p),{x:0,y:0,z:0}),1/v.length);
   // Intersect the half-spaces of both triangles on top and bottom. On a
   // twisted mitre this conservatively keeps the entire pocket below both.
-  const stockPlanes = faces.map(face => {
+  const stockFaces = beam.housingOutline ? beam.faces : faces;
+  const stockPlanes = stockFaces.map(face => {
     const [p,q,r] = face.map(i => v[i]);
     let n = unit(cross(sub(q,p),sub(r,p)));
     if (dot(n,sub(center,p))>0) n=mul(n,-1);
