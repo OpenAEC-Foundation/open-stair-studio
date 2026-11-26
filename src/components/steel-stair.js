@@ -8,6 +8,7 @@ function fields(escape) {
   return [
     pick('layout','Vluchtverloop',escape?'return':'straight',[['straight','Rechte vlucht'],['return','Twee vluchten met keerbordes']]),
     pick('treadType','Treden en bordesvloer',escape?'grating':'plate',[['plate','Gezette staalplaat'],['grating','Open stalen rooster']]),
+    pick('stringerStyle','Vorm van de plaatwang','solid',[['solid','Gesloten plaatwang'],['openFrame','Open driehoekframe met voetregel']]),
     pick('railSide','Leuning bij stijgen','both',[['both','Beide zijden'],['left','Links'],['right','Rechts'],['none','Geen leuning']]),
     n('width','Vrije tredebreedte tussen wangen',escape?1200:1000,600,1800),
     n('risers','Optredes inclusief bordes',16,6,36,'st.'),n('going','Aantrede',260,180,400),
@@ -111,6 +112,30 @@ function sidePlate(xz,y0,y1) {
   });
   return prism(corners.map(([x,z])=>({x,y:-z})),y0,y1).map(f=>f.map(p=>pt(p.x,p.z,-p.y)));
 }
+// Perforated plate in the same X/Z coordinates as sidePlate. Triangulate both
+// caps around the opening and close every perimeter edge across the thickness.
+function openSidePlate(outer,hole,y0,y1) {
+  const loops=[outer,hole],flat=loops.flat();
+  const triangles=earcut(flat.flat(),[outer.length]);
+  const at=(i,y)=>pt(flat[i][0],y,flat[i][1]);
+  const faces=[];
+  for(let i=0;i<triangles.length;i+=3) {
+    const ids=triangles.slice(i,i+3);
+    const [a,b,c]=ids.map(j=>flat[j]);
+    const signed=(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+    const ccw=signed>0?ids:ids.toReversed();
+    faces.push(ccw.map(j=>at(j,y0)),ccw.toReversed().map(j=>at(j,y1)));
+  }
+  let offset=0;
+  for(const loop of loops) {
+    for(let i=0;i<loop.length;i++) {
+      const a=offset+i,b=offset+(i+1)%loop.length;
+      faces.push([at(a,y0),at(a,y1),at(b,y1),at(b,y0)]);
+    }
+    offset+=loop.length;
+  }
+  return faces;
+}
 function foldedPlate(length,width,thickness) {
   const lip=35;
   return sidePlate([[0,0],[length,0],[length,-lip],[length-thickness,-lip],[length-thickness,-thickness],
@@ -167,6 +192,8 @@ function builder(defs,isEscape) {
     if(!Number.isFinite(p.height)||p.height<=0||p.height>10000) issues.push({level:'error',text:'Controleer de verdiepingshoogte.'});
     const rise=p.height/p.risers,grated=p.treadType==='grating',deck=grated?p.gratingDepth:35;
     if(rise<=deck+50) issues.push({level:'error',text:'Optrede te klein voor de tredeconstructie, opleghoek en voetplaat.'});
+    if(p.stringerStyle==='openFrame'&&p.layout!=='straight')
+      issues.push({level:'error',text:'Het open driehoekframe is voorlopig alleen voor een rechte vlucht beschikbaar.'});
     if(issues.length) return result;
     const material=p.finish;
     function add(id,label,kind,role,faces,move=v=>v,attributes={}) {
@@ -231,9 +258,16 @@ function builder(defs,isEscape) {
       const outline=[[0,foot],[footLength,foot],[footLength,bottom(footLength)]];
       if(cut>footLength+.0001&&cut<run-.0001) outline.push([cut,foot]);
       outline.push([run,bottom(run)],[run,end],[0,rise]);
+      const web=Math.max(40,p.stringerThickness*5);
+      const frameOuter=[[0,foot],[run,foot],[run,end],[0,rise]];
+      const frameHole=[[web*2,foot+web],[run-web,top(run-web)-web],[run-web,foot+web]];
       for(const sign of [-1,1]) {
         const code=sign>0?'L':'R',inside=sign*p.width/2,outside=sign*(p.width/2+p.stringerThickness),y=(inside+outside)/2;
-        mapPart('wang-'+code,'Plaatwang '+code,'member','stringer',sidePlate(outline,Math.min(inside,outside),Math.max(inside,outside)));
+        const profile=p.stringerStyle==='openFrame'&&run>web*4&&top(run-web)-web>foot+web*2
+          ? openSidePlate(frameOuter,frameHole,Math.min(inside,outside),Math.max(inside,outside))
+          : sidePlate(outline,Math.min(inside,outside),Math.max(inside,outside));
+        mapPart('wang-'+code,p.stringerStyle==='openFrame'?'Open driehoekwang '+code:'Plaatwang '+code,
+          'member','stringer',profile);
         if(name==='vlucht-1') anchoredFoot(mapPart,'voet-'+code,'Wangvoetplaat '+code,footLength/2,y,0,footLength,90,foot,p.steelEmbed);
         else mapPart('voet-'+code,'Wangvoetplaat '+code,'plate','basePlate',box(0,y-45,0,footLength,y+45,foot));
         const faceInner=inside-sign*65;

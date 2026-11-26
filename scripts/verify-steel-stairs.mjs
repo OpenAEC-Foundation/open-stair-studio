@@ -67,6 +67,22 @@ for(const railSide of ['left','right','none','both']) {
   const sides=railSide==='both'?2:railSide==='none'?0:1;
   near(metric(g,'Vrije doorgangsbreedte'),1200-sides*(22+42.4/2));
 }
+const short={layout:'straight',treadType:'grating',risers:6,height:1080,width:900,going:240,railSide:'none'};
+const open=steelStair.build({...short,stringerStyle:'openFrame'});
+const closed=steelStair.build({...short,stringerStyle:'solid'});
+assert.equal(open.parts.filter(p=>p.role==='gratingTread').length,5,'five grating treads');
+assert(!open.parts.some(p=>p.kind==='railing'||p.role==='guardPost'));
+for(const p of open.parts) closedVolume(p);
+for(const side of ['L','R']) {
+  const id='vlucht-1-wang-'+side;
+  const frame=open.parts.find(p=>p.id===id),plate=closed.parts.find(p=>p.id===id);
+  assert(frame.faces.length>plate.faces.length,'triangular opening is modeled in the side plate');
+  assert(frame.volumeM3<plate.volumeM3,'opening reduces actual steel takeoff');
+  assert(open.structural.checks.filter(c=>c.id.startsWith(id+'-')&&
+    ['-buiging','-doorbuiging','-kip','-doorsnede'].some(s=>c.id.endsWith(s)))
+    .every(c=>c.status==='open'),'solid plate checks cannot certify the perforated frame');
+}
+assert.equal(steelStair.build({...short,stringerStyle:'openFrame',layout:'return'}).parts.length,0);
 for(const invalid of [{railSide:'maybe'},{going:-5},{risers:16.2},{height:600,risers:36},{escapeBasis:31}])
   assert.equal(escapeStair.build(invalid).parts.length,0);
 console.log(`Staal- en vluchttrappen: ${count} gesloten onderdelen, bordes- en tredepeilen, open roostermaat/massa, kokerprofielen, opleghoeken, vier hekwerkstanden en ongeldige invoer gecontroleerd.`);

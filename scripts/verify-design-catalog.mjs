@@ -12,7 +12,7 @@ import {boundsOf} from '../src/components/solids.js';
 const cases=[
   ['glass',{layers:4,risers:10,guard:'left'}],
   ['cantilever',{risers:10,guard:'free'}],
-  ['steel',{risers:11,layout:'return',railSide:'left'}],
+  ['steel',{risers:6,layout:'straight',treadType:'grating',stringerStyle:'openFrame',railSide:'left'}],
   ['escape',{risers:13,layout:'return',railSide:'both'}],
   ['portable',{steps:5,guard:'sides',accessHeight:1270}],
   ['ladder',{rungs:8,handholds:'pair',accessHeight:2470}]

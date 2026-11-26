@@ -2,6 +2,11 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.13
+
+- Stalen rechte trappen kunnen nu een open driehoekige plaatwang met doorlopende voetregel krijgen, zoals bij een korte roostertrap. De opening wordt als echt gat in 3D, massa, onderdelenstaat en IFC4 gemodelleerd.
+- De sterkte- en doorbuigingstoets van deze nieuwe framevorm blijft op “Open” totdat een projectspecifiek doorsnede- en stabiliteitsmodel is vastgelegd. De bestaande volle-plaatberekening wordt niet ten onrechte als bewijs gebruikt.
+
 ## Nieuw in 0.13.12
 
 - Ingekroosde trapbomen krijgen verticale kopse uiteinden bij de eerste trede en de bovenvloer. De onderste punt sluit aan op de vloer of de onderzijde van het bordes, zonder uitstekende strook.

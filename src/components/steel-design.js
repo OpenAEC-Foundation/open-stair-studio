@@ -131,7 +131,8 @@ export function calculateSteel(p,parts,stations) {
   function connection(id,label,partIds,focusIds,checkIds,note) {
     connections.push({id,label,partIds,focusIds,checkIds,note});
   }
-  const grate=p.treadType==='grating',byPrefix=id=>parts.filter(v=>v.id.startsWith(id+'-'));
+  const grate=p.treadType==='grating',solidStringer=p.stringerStyle!=='openFrame',
+    byPrefix=id=>parts.filter(v=>v.id.startsWith(id+'-'));
   const ids=v=>v.map(x=>x.id);
   const stressLimit=t=>Math.min(p.steelFyd,p.steelGrade==='S235'?(t>16?225:235):(t>16?345:355));
   function beamChecks(id,label,beam,t,group,note,basis=model) {
@@ -198,17 +199,19 @@ export function calculateSteel(p,parts,stations) {
       const response=stringerResponse(p,L,cos,section,loads);
       const note='Vlaklast per trede en staalmassa per onderdeel op het zwaartepunt. Horizontale lengte '+run+
         ' mm; loodrechte lijfhoogte '+(p.stringerDepth*cos).toFixed(1)+' mm. Eén wang draagt de volledige randpuntlast.';
-      beamChecks(wang,'Plaatwang '+name+' '+side,response,p.stringerThickness,[wang],note);
+      beamChecks(wang,'Plaatwang '+name+' '+side,response,p.stringerThickness,[wang],
+        solidStringer?note:'Open driehoekframe: doorsnede, knooppuntstijfheid en stabiliteit projectmatig bepalen. '+note,
+        model&&solidStringer);
       const stability=spec(p.steelStabilityBasis)&&p.steelBracingPitch>0&&p.steelBracingPitch<=L;
       check(wang+'-kip','Plaatwang '+name+' '+side+' · kipweerstand','UGT',response.stress*section.W/1e6,p.steelBucklingMRd,'kNm',
-        'Projectweerstand voor getekende plaatwang bij zijdelings gesteunde lengte '+p.steelBracingPitch+' mm; onderbouw werkelijk steunpunt, torsiebeperking en verbinding.',[wang],model&&stability);
+        'Projectweerstand voor getekende plaatwang bij zijdelings gesteunde lengte '+p.steelBracingPitch+' mm; onderbouw werkelijk steunpunt, torsiebeperking en verbinding.',[wang],model&&stability&&solidStringer);
       const verticalV=Math.max(...['bottom','top'].map(key=>p.designGammaG*response[key].G+
         p.designGammaQ*Math.max(response[key].Q,p.designP*1000)));
       const area=p.stringerThickness*p.stringerDepth*cos;
       const normal=verticalV*Math.sqrt(1-cos*cos)/area,tau=1.5*verticalV*cos/area;
       check(wang+'-doorsnede','Plaatwang '+name+' '+side+' · N/M/V','UGT',
         model?Math.hypot(response.stress+normal,Math.sqrt(3)*tau):null,stressLimit(p.stringerThickness),'N/mm²',
-        'Omhullende elastische vergelijkspanning op de volle rechthoek. Verticale reacties, één horizontaal vrije oplegging. σ = |M|/W + |N|/A; τ = 1,5 |V|/A.',[wang]);
+        'Omhullende elastische vergelijkspanning op de volle rechthoek. Verticale reacties, één horizontaal vrije oplegging. σ = |M|/W + |N|/A; τ = 1,5 |V|/A. Open driehoekframe vereist een eigen doorsnedemodel.',[wang],model&&solidStringer);
       unresolved(wang+'-stabiliteit','Wang '+side+' · stabiliteit en voetdoorsnede',
         'Kip, knik onder normaalkracht, torsie en lijf bij de uitgekepte voet vereisen de zijdelingse steunpunten en het uitvoeringsdetail.',[wang,voet,kop]);
       const seatCheck=check(name+'-opleghoek-'+side,'Trede-opleghoek en las '+side,'UGT',model?seatV:null,p.steelCleatRd,'kN',
