@@ -1,4 +1,5 @@
 import { ruleProfiles, stairFamilies, starterProject } from './stair.js';
+import { isWinder } from './winder.js';
 import { readWell } from './stairwell.js';
 import {timberDimensions, timberStyles, noseNames} from './timber-settings.js';
 import { validateCamField } from './housing-cam.js';
@@ -124,6 +125,7 @@ export function readProject(raw) {
       if (Object.hasOwn(raw[section], key)) model[section][key] = readField(section, key, raw[section][key]);
     }
   }
+  if (isWinder(model.stair.type)) model.stair.riserPosition = 'auto';
   if (!raw.engineering && model.regulatory.profile === 'NL_NEW_EGRESS') model.engineering.use = 'escape-only';
   if (Object.hasOwn(raw, 'engineeringVariants')) {
     if (!isRecord(raw.engineeringVariants)) throw new Error('De productdossiers zijn ongeldig.');
@@ -152,9 +154,10 @@ export function editSession(session, section, key, value) {
   if (Object.is(session.model[section][key], value) && !(section === 'stair' && key === 'type' && !session.model.stairEnabled)) return session;
   const model = { ...session.model, [section]: { ...session.model[section], [key]: value } };
   if (section === 'stair' && key === 'type') model.stairEnabled = true;
-  if(section==='stair'&&key==='type'&&['quarter_winder','half_winder'].includes(value)){
-    model.stair.stringerLeft='housed';model.stair.stringerRight='housed';
-    model.stair.riserJoint='butt';
+  if (section === 'stair' && key === 'type' && isWinder(value)) {
+    model.stair.stringerLeft = 'housed';
+    model.stair.stringerRight = 'housed';
+    model.stair.riserPosition = 'auto';
   }
   if(section==='stair'&&key==='riserPosition'&&value==='manual') model.stair.riserJoint='butt';
   // Surveyed widths refer to a particular stair layout. Undo restores both

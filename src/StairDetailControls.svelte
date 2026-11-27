@@ -4,7 +4,7 @@
   export let parts = [];
   export let update;
   export let issue = null;
-  $: supportsGrooves = stair.riserPosition!=='manual' && !['quarter_winder','half_winder'].includes(stair.type);
+  $: supportsGrooves = stair.riserPosition!=='manual';
   function exportDetails() {
     if (issue) return;
     const rows=[['Merk','Onderdeel','Materiaal','Aantal','Aslengte mm','Diameter mm','Hoogte mm','Dikte mm','Netto m³','Profiel','Ruwlengte mm','Ruwbreedte mm','Ruwdikte mm','Bruto m³'],
@@ -43,7 +43,7 @@
     <select id="riser-joint" value={stair.riserJoint} onchange={e=>update('riserJoint',e.currentTarget.value)}>
       <option value="butt">Stuikend</option><option value="housed" disabled={!supportsGrooves}>Ingefreesd in trede en boom</option>
     </select>
-    {#if !supportsGrooves}<small>Infrezingen zijn beschikbaar voor verticale stootborden in rechte vluchten en bordestrappen.</small>{/if}
+    {#if !supportsGrooves}<small>Kies een verticaal stootbord om de groefverbinding te gebruiken.</small>{/if}
     {#if stair.riserJoint==='housed'}
       <label for="riser-groove-depth">Groefdiepte in trede of bordes (mm)</label>
       <input id="riser-groove-depth" class="text-field" type="number" min="1" max="30" step="0.1" value={stair.riserGrooveDepth} onchange={e=>update('riserGrooveDepth',e.currentTarget)}/>

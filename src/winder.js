@@ -1,6 +1,7 @@
 import { buildStairViews } from './stair-views.js';
 import { goingBandWidth } from './going-band.js';
 import { buildWinderSchedule } from './winder-parts.js';
+import { housedRisers } from './timber-riser.js';
 
 const quarter = Math.PI / 2;
 const epsilon = 1e-7;
@@ -56,7 +57,8 @@ function makeRoute(stair, d) {
   const route = { radius: d.radius, angle: d.angle, start, end };
   // One physical facet per station in the bend. These are also the edges in
   // the part drawing and the IFC profile. No independent arc approximation.
-  const extension = d.clearWidth + going + Math.abs(Number(stair.nosing)||0);
+  const extension = d.clearWidth + going + Math.abs(Number(stair.nosing)||0) +
+    (housedRisers(stair) ? Number(stair.riserThickness) + (Number(stair.wellatWidth)||0) : 0);
   const stations = [-extension, ...Array.from({ length: d.turnSteps + 1 }, (_, i) => start + i * going), d.totalRun + extension];
   const square = (stair.outerShape ?? 'square') === 'square';
   const corners = square ? Array.from({ length: Math.round(d.angle/quarter) }, (_, i) => start + (i + .5) * quarter * d.radius) : [];
@@ -119,23 +121,30 @@ function interval(rail, first, last) {
 
 function makeCuts(stair, d) {
   const { route, stations, sides, section } = makeRoute(stair, d);
-  const fronts = [], backs = [];
+  const housed = housedRisers(stair);
+  const seatDepth = housed ? Number(stair.riserThickness) : 0;
+  const lip = housed && stair.wellatType === 'chamfered' ? Number(stair.wellatWidth) : 0;
+  if (!(seatDepth >= 0 && lip >= 0) || (housed && seatDepth === 0)) return null;
+  const fronts = [], noses = [], seatEnds = [];
+  function intersect(cut, offset) {
+    // Offset the same section plane along its local normal. Advancing the
+    // station around the bend would rotate the back of a vertical board.
+    const plane = { ...cut, at:add(cut.at,cut.forward,offset) };
+    plane.hits = sides.map((rail,j) => cutRail(rail, stations[j], plane));
+    return plane;
+  }
   for (let i = 0; i <= d.treadCount; i++) {
-    const front = section(i * stair.going - Number(stair.nosing||0));
-    front.hits = sides.map((rail,j) => cutRail(rail, stations[j], front));
+    const front = intersect(section(i * stair.going - Number(stair.nosing||0)), 0);
     fronts.push(front);
-    if (i === 0) continue;
-    // The nose setting translates every tread boundary along the route. The
-    // trailing boundary remains the next tread's leading boundary.
-    backs.push(front);
+    noses.push(lip && i < d.treadCount ? intersect(front,-lip) : front);
+    seatEnds.push(seatDepth ? intersect(front,seatDepth) : front);
   }
-  for (let i = 0; i < d.treadCount; i++) {
-    for (let side = 0; side < 2; side++) {
-      const a = fronts[i].hits[side], b = fronts[i + 1].hits[side], c = backs[i].hits[side];
-      if (!a || !b || !c || b.index <= a.index + epsilon || c.index < b.index - epsilon) return null;
-    }
+  for (let i = 0; i <= d.treadCount; i++) for (let side = 0; side < 2; side++) {
+    const nose = noses[i].hits[side], face = fronts[i].hits[side], end = seatEnds[i].hits[side];
+    if (!nose || !face || !end || nose.index > face.index + epsilon || end.index < face.index - epsilon) return null;
+    if (i && nose.index <= seatEnds[i-1].hits[side].index + epsilon) return null;
   }
-  return { route, sides, fronts, backs };
+  return { route, sides, fronts, noses, seatEnds, housed };
 }
 
 function basicIssues(stair, d) {
@@ -157,7 +166,10 @@ export function winderIssues(stair) {
   const d = deriveWinder(stair);
   const issues = basicIssues(stair, d);
   if (issues.length) return issues;
-  return makeCuts(stair, d) ? [] : ['De tredegrenzen snijden de wang in deze bocht niet in oplopende volgorde. Vergroot de bochtstraal of verklein het neusoverstek.'];
+  if (makeCuts(stair,d)) return [];
+  return [housedRisers(stair)
+    ? 'De trede, wellat of stootbordoplegging past niet tussen de opeenvolgende snijlijnen aan de wang. Controleer binnenstraal, neuspositie, wellatbreedte en stootborddikte.'
+    : 'De tredegrenzen snijden de wang in deze bocht niet in oplopende volgorde. Vergroot de bochtstraal of verklein het neusoverstek.'];
 }
 
 // Offsetting consecutive rail facets by the actual board thickness gives a
@@ -256,9 +268,9 @@ export function generateWinderGeometry(stair, family, options) {
   const treads = [], landings = [], walkline = [];
   if (cuts) {
     for (let i = 0; i < treadCount; i++) {
-      const front = cuts.fronts[i], next = cuts.fronts[i + 1], back = cuts.backs[i];
-      const between = edge => cuts.sides.map((side,j) => interval(side, front.hits[j], edge.hits[j]));
-      const [inner, outer] = between(back);
+      const front = cuts.fronts[i], next = cuts.fronts[i + 1], nose = cuts.noses[i];
+      const between = (a,b) => cuts.sides.map((side,j) => interval(side, a.hits[j], b.hits[j]));
+      const [inner, outer] = between(nose,cuts.seatEnds[i+1]);
       const polygon = (innerSide, outerSide) => [...outerSide, ...innerSide.toReversed()];
       const physical = polygon(inner, outer);
       const points = physical.map(reflect);
@@ -268,15 +280,15 @@ export function generateWinderGeometry(stair, family, options) {
       // Ray starts on the leading (nosing) edge, at the exact walking line.
       // Take the first exit from the finite polygon, including a possible
       // exit through a side wall on an unusually tight bend.
-      const normalDepth = contour => {
+      const normalDepth = (contour,startPlane) => {
         let distance = Infinity;
         for (let j = 0; j < contour.length; j++) {
           const start = contour[j], end = contour[(j+1) % contour.length];
           const edge = sub(end,start);
           const divisor = cross(front.forward,edge);
           if (Math.abs(divisor) < epsilon) continue;
-          const along = cross(sub(start, front.at),edge)/divisor;
-          const fraction = cross(sub(start,front.at),front.forward)/divisor;
+          const along = cross(sub(start, startPlane.at),edge)/divisor;
+          const fraction = cross(sub(start,startPlane.at),front.forward)/divisor;
           if (along > epsilon && fraction >= -epsilon && fraction <= 1+epsilon) distance = Math.min(distance, along);
         }
         return distance;
@@ -284,14 +296,22 @@ export function generateWinderGeometry(stair, family, options) {
       const center = reflect(routePoint((i + .5) * stair.going - Number(stair.nosing||0), 0, cuts.route));
       const widths = points.map(p => p.x), heights = points.map(p => p.y);
       const isWinder = Math.abs(front.angle - next.angle) > epsilon || points.length > 4;
-      const goingContour = polygon(...between(next));
+      const goingContour = polygon(...between(front,next));
+      const visible = between(nose,next);
+      const seat = index => {
+        const start = cuts.fronts[index], end = cuts.seatEnds[index];
+        const points = polygon(...between(start,end)).map(reflect);
+        if (polygonArea(points)<0) points.reverse();
+        return {points,direction:reflect(start.forward)};
+      };
       const eligibleAt170Mm = goingBandWidth(front.hits.map(hit => hit.point), front.forward, goingContour, 170);
       treads.push({ id: `${stair.mark}-TD-${String(i + 1).padStart(2,'0')}`, flightIndex: 0, step: i + 1,
         level: i + 1, elevation: (i + 1) * rise, thickness: stair.treadThickness, length: Math.max(...widths) - Math.min(...widths),
         width: Math.max(...heights) - Math.min(...heights), center, direction: reflect(front.forward),
         points, svgPoints: svgPoints(points), area, volume: area * stair.treadThickness / 1e9,
-        frontEdge: front.hits.map(hit => reflect(hit.point)), isWinder, eligibleAt170Mm, goingAtWalkline: normalDepth(goingContour),
-        depthAtWalkline: normalDepth(physical), narrowDepth: Math.min(edgeLength(inner), edgeLength(outer)) });
+        frontEdge: nose.hits.map(hit => reflect(hit.point)), isWinder, eligibleAt170Mm, goingAtWalkline: normalDepth(goingContour,front),
+        depthAtWalkline: normalDepth(polygon(...visible),nose), narrowDepth: Math.min(...visible.map(edgeLength)),
+        ...(cuts.housed ? {riserSeat:seat(i), ...(i===treadCount-1 ? {exitRiserSeat:seat(i+1)} : {})} : {}) });
     }
     for (let i = 0; i <= treadCount * 8; i++) walkline.push(reflect(routePoint(i * stair.going / 8, 0, cuts.route)));
   }

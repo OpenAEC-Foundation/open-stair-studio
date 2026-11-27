@@ -35,6 +35,14 @@ delete archivedClosed.stair.riserJoint;
 delete archivedClosed.stair.riserGrooveDepth;
 assert.equal(readProject(archivedClosed).stair.riserJoint,'butt');
 const customJoint = {...project.stair,riserJoint:'housed',riserGrooveDepth:6.5};
+for (const type of ['quarter_winder','half_winder']) {
+  const session = editSession(startSession({...project,stair:customJoint}), 'stair','type',type);
+  assert.equal(session.model.stair.riserJoint,'housed');
+  assert.deepEqual(readProject(JSON.parse(JSON.stringify(session.model))).stair,session.model.stair);
+  const legacy = {...project,stair:{...project.stair,type,riserPosition:'manual',riserJoint:'butt'}};
+  assert.equal(readProject(legacy).stair.riserPosition,'auto');
+  assert.equal(readProject(legacy).stair.riserJoint,'butt');
+}
 assert.deepEqual(readProject({...project,stair:customJoint}).stair,customJoint);
 assert.equal(migrated.joinery.type, 'none');
 assert.equal(readProject({ ...archive, schema: project.schema.replace(/0\.\d+\.json$/, '0.3.json'), version: '0.3.0' }).joinery.type, 'none');

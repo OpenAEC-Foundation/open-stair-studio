@@ -1,7 +1,5 @@
-import { isWinder } from './winder.js';
-
-export const housedStraightRisers = stair => stair.riserBoards==='closed' &&
-  stair.riserJoint==='housed' && stair.riserPosition!=='manual' && !isWinder(stair.type);
+export const housedRisers = stair => stair.riserBoards==='closed' &&
+  stair.riserJoint==='housed' && stair.riserPosition!=='manual';
 
 const signedArea = points=>points.reduce((sum,a,i)=>{
   const b=points[(i+1)%points.length];

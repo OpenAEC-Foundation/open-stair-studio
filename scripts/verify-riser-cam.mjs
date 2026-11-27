@@ -19,6 +19,16 @@ for(const [type,hand] of [['straight','left'],['quarter_turn','left'],['quarter_
       assert.deepEqual(results.map(r=>r.setup.face),['underside','top'],host.id+' both setups, top last for profiling');
       for(const {setup,job,problem} of results) {
         assert.ok(job,problem);
+        if (!setups) {
+          // A wide blank can enclose a groove even when profiling would
+          // cut a notch through it. The CNC export must catch the whole edge.
+          const pocket=setup.pockets[0].contour;
+          const midX=pocket.reduce((sum,p)=>sum+p.x,0)/pocket.length;
+          const midY=pocket.reduce((sum,p)=>sum+p.y,0)/pocket.length;
+          const notch=[{x:0,y:0},{x:setup.length,y:0},{x:setup.length,y:setup.width},
+            {x:midX+1,y:setup.width},{x:midX+1,y:midY},{x:midX-1,y:midY},{x:midX-1,y:setup.width},{x:0,y:setup.width}];
+          assert.throws(()=>compileHousingJob({...setup,partContour:notch},model.cam),/afgewerkte buitencontour/);
+        }
         const program=writeLinuxCnc(job);
         assert.ok(program.includes(setup.face==='underside'?'UNDERSIDE UP':'TOP FACE UP'));
         const dxf=writeHousingDxf(setup,job.metadata);

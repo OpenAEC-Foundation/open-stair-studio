@@ -66,7 +66,12 @@
       <RiserGrooveSheet results={grooveResults} {model} {downloadFile}/>
       {#if part.joineryFeatures?.length}
         <h3>Insteeklippen stootbord</h3>
-        <p>Maten vanaf de rechte schouder van het stootbord. Meet in de breedte naar links bij oplopen, in de hoogte vanaf de voet en in de dikte vanaf de zichtzijde.</p>
+        {#if part.planPoints}
+          <p>De tabel geeft de uiterste lipmaten. Meet de breedte vanaf het meest rechtse punt van het bordlichaam naar links bij oplopen, de hoogte vanaf de voet en de dikte vanaf de zichtzijde. Het bovenaanzicht toont de schuine kopvlakken.</p>
+          <p><b>Hoekpunten bordlichaam (breedte / dikte in mm)</b><br/>{views[0].paths[0].points.map(q=>mm(q.x)+' / '+mm(q.y)).join(' · ')}</p>
+        {:else}
+          <p>Maten vanaf de rechte schouder van het stootbord. Meet in de breedte naar links bij oplopen, in de hoogte vanaf de voet en in de dikte vanaf de zichtzijde.</p>
+        {/if}
         <table><thead><tr><th>Ontvangend onderdeel</th><th>Insteek (mm)</th><th>Breedte van – tot (mm)</th><th>Hoogte van – tot (mm)</th><th>Dikte van – tot (mm)</th></tr></thead>
         <tbody>{#each part.joineryFeatures as f}
           {@const b=f.localTongueBox}

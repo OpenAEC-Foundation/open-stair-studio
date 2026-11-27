@@ -2,6 +2,11 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.18
+
+- Houten kwartslag- en halfslagtrappen met verdreven treden ondersteunen ingefreesde stootborden, linksom en rechtsom. Bij het verplaatsen van de neus volgen de trede, de oplegging van het volgende stootbord, de lippen en de bijbehorende groeven.
+- Bij een haakse of gefacetteerde buitenwang bepaalt het werkelijke wangsegment de positie van de zijlip. Een plaatselijk verkorte insteek bij een verstek staat op het stootbordblad. Het tredeblad geeft de opspanzijde en de hoekpunten van de schuine groef voor CNC. De IFC4-export koppelt ieder stootbord aan de onderdelen waarin zijn lippen vallen.
+
 ## Nieuw in 0.13.17
 
 - Kies bij houten trappen onder **Houtdetails → Verbinding stootbord** voor **Ingefreesd in trede en boom**. Verticale stootborden krijgen lippen in de aangrenzende treden, de ingekroosde bomen en het tussenbordes. Aan de vloer en bij de kopse wang toont het werkblad de werkelijke beëindiging. Opgeslagen ontwerpen behouden hun bestaande aansluiting.

@@ -94,10 +94,53 @@ function railViews(p) {
   ];
 }
 
+// Silhouette of a convex tongue projected onto one of the board's working planes.
+function silhouette(points) {
+  const sorted = [...points].sort((a,b) => a.x-b.x || a.y-b.y);
+  const half = sequence => {
+    const chain=[];
+    for (const c of sequence) {
+      while (chain.length>1) {
+        const [a,b]=chain.slice(-2);
+        if ((b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x)>1e-7) break;
+        chain.pop();
+      }
+      chain.push(c);
+    }
+    return chain.slice(0,-1);
+  };
+  return [...half(sorted),...half(sorted.reverse())];
+}
+
+function winderRiserViews(p) {
+  const frame=p.riserFrame;
+  const local = v => {
+    const d=subtract(v,frame.origin);
+    return {x:dot(d,frame.xAxis),y:dot(d,frame.yAxis),z:dot(d,frame.zAxis)};
+  };
+  const feet=p.planPoints.map(v=>local({...v,z:frame.origin.z}));
+  const body=[...feet,...feet.map(v=>({...v,z:p.heightMm}))];
+  const lips=p.joineryFeatures.map(f => {
+    const tip=f.tongueWorldContour.map(v=>({
+      x:v.x+f.tongueDepth*f.inward.x, y:v.y+f.tongueDepth*f.inward.y, z:v.z+f.tongueDepth*f.inward.z
+    }));
+    return [...f.tongueWorldContour,...tip].map(local);
+  });
+  const project=(view,a,b)=>view.map(v=>point(v[a],v[b]));
+  const view=(a,b,outline)=>[line(outline),...lips.map(lip=>line(silhouette(project(lip,a,b)),'joint'))];
+  return [
+    diagram('Stootbord · bovenaanzicht',view('y','x',project(feet,'y','x')),
+      'Kopvlakken en lippen in plankcoördinaten. Horizontaal naar links bij oplopen, verticaal naar de achterkant.'),
+    diagram('Stootbord · vooraanzicht',view('y','z',silhouette(project(body,'y','z'))),
+      'Hoogten vanaf de voet van het stootbord. De groene contouren geven de lippen aan.')
+  ];
+}
+
 export function timberViews(row, stationIndex = 0) {
   if (row.type === 'tread') return treadViews(row.part);
   if (row.type === 'handrail') return railViews(row.part);
   if (row.type === 'riser' || row.type === 'nosingStrip') {
+    if (row.type==='riser' && row.part.planPoints && row.part.joineryFeatures?.length) return winderRiserViews(row.part);
     const p=row.part, top=diagram('Plankvoet · bovenaanzicht',[line(p.faceContour)],'Lokale X langs de voorrand. Y loopt van de zichtzijde naar achteren.');
     if (row.type==='nosingStrip') return [top,diagram('Wellat · dwarsdoorsnede',[line(p.profileContour)],'Gemeten loodrecht op de lengteas van de wellat.')];
     if (p.joineryFeatures?.length) {

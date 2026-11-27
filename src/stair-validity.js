@@ -1,5 +1,5 @@
 import { isWinder, winderIssues } from './winder.js';
-import { housedStraightRisers } from './timber-riser.js';
+import { housedRisers } from './timber-riser.js';
 
 export function treadClearanceIssue(stair, d, system='timber') {
   const free=d.rise-stair.treadThickness;
@@ -18,7 +18,7 @@ export function geometryErrors(stair, d, system='timber') {
   const clearance=treadClearanceIssue(stair,d,system);
   if(clearance) add(clearance.title,clearance.detail);
   if(system==='timber' && stair.riserBoards==='closed' && stair.wellatType==='chamfered' &&
-    ((!housedStraightRisers(stair) && stair.wellatWidth>stair.nosing-stair.riserThickness) || stair.wellatHeight>d.rise-stair.treadThickness))
+    ((!housedRisers(stair) && stair.wellatWidth>stair.nosing-stair.riserThickness) || stair.wellatHeight>d.rise-stair.treadThickness))
     add('Wellat past niet onder de trede','Controleer de breedte van de wel en de vrije hoogte tussen de treden.');
   if(system==='timber' && ['round','bevel'].includes(stair.noseProfile) && !(stair.noseSize>0 && stair.noseSize<stair.treadThickness))
     add('Neusprofiel past niet in de trede','Kies een profielmaat tussen nul en de trededikte zodat er een rechte voorzijde onder het profiel blijft.');

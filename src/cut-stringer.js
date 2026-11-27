@@ -1,6 +1,6 @@
 import earcut from 'earcut';
 import Drawing from 'dxf-writer';
-import { housedStraightRisers } from './timber-riser.js';
+import { housedRisers } from './timber-riser.js';
 
 const round=n=>Number(n.toFixed(3));
 const area=points=>Math.abs(points.reduce((sum,p,i)=>{
@@ -16,7 +16,7 @@ export function makeCutStringer(stair,flight,side,normal,rise) {
   const thickness=Number(stair.stringerThickness), depth=Number(stair.stringerDepth);
   const nose=Number(stair.nosing)||0;
   const entry=flight.index>0?1:0;
-  const rearSeat=housedStraightRisers(stair)?Number(stair.riserThickness):0;
+  const rearSeat=housedRisers(stair)?Number(stair.riserThickness):0;
   const startX=entry?-going:-nose;
   const top=[];
   if(entry){

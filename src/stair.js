@@ -2,7 +2,7 @@ import { geometryErrors } from './stair-validity.js';
 import { emptyWell } from './stairwell.js';
 import { detailDefaults } from './stair-details.js';
 import { timberDefaults } from './timber-settings.js';
-import { housedStraightRisers } from './timber-riser.js';
+import { housedRisers } from './timber-riser.js';
 import { buildStairViews } from './stair-views.js';
 import { buildLandingFrame } from './landing-frame.js';
 import { makeCutStringer } from './cut-stringer.js';
@@ -34,7 +34,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.17',
+  version: '0.13.18',
   stairEnabled: true,
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
@@ -151,7 +151,7 @@ export function generateStairGeometry(stair, options) {
   const rightEdge=cutRight?-width/2-overhang:-width/2+stringerThickness;
   const treadWidth=Math.max(1,leftEdge-rightEdge);
   const treadOffset=(leftEdge+rightEdge)/2;
-  const groovedRisers=housedStraightRisers(stair);
+  const groovedRisers=housedRisers(stair);
   const rearSeat=groovedRisers ? Number(stair.riserThickness) : 0;
   const frontLip=groovedRisers && stair.wellatType==='chamfered' ? Number(stair.wellatWidth) : 0;
   const physicalRun=going+rearSeat+frontLip;

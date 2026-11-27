@@ -20,6 +20,9 @@
   const length = value => value.toLocaleString('nl-NL', { maximumFractionDigits: 1 });
   const cubic = value => value.toLocaleString('nl-NL', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
   const pointString = pts => pts.map(p => p.x + ',' + p.y).join(' ');
+  $: windingSetup = geometry.dimensions.family.winder
+    ? (model.stair.turnDirection==='right'?'Rechtsom':'Linksom')+' bij oplopen · neuspositie '+length(model.stair.nosing)+' mm'
+    : '';
 
   function openDetail(id) {
     selectedId = id;
@@ -60,7 +63,7 @@
     <button class="action-btn go-cam" onclick={() => openTreadCam(selected.id)}>Trede frezen</button>
   </div>
   <article class="tread-sheet">
-    <header><h2>{selected.id}</h2><p>{selected.name} · bovenaanzicht · bovenkant +{length(selected.elevation)} mm</p></header>
+    <header><h2>{selected.id}</h2><p>{selected.name} · bovenaanzicht · bovenkant +{length(selected.elevation)} mm{windingSetup?' · '+windingSetup:''}</p></header>
     <div class="sheet-grid">
       <div class="board-view">
         <svg viewBox={[-20, -20, selected.length + 40, selected.width + 40].join(' ')} preserveAspectRatio="xMidYMid meet" role="img" aria-label={'Contour van ' + selected.id + ' in de ruwe plank'}>
@@ -102,7 +105,7 @@
     <p class="stock-note">De DXF bevat de gesloten contour in millimeters. Het nulpunt ligt linksonder op de ruwe plank in dit bovenaanzicht. De ruwe plankmaat is naar boven afgerond op hele millimeters.</p>
     {#if grooveResults.length}
       <div class="groove-set">
-        <p class="print-groove-title">{model.project.number} · revisie {model.project.revision} · {selected.id} · bewerkingsvlakken</p>
+        <p class="print-groove-title">{model.project.number} · revisie {model.project.revision} · {selected.id} · bewerkingsvlakken{windingSetup?' · '+windingSetup:''}</p>
         <RiserGrooveSheet results={grooveResults} {model} {downloadFile}/>
       </div>
     {/if}

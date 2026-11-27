@@ -30,19 +30,24 @@ function distance(x,y,[[a,b],[c,d]]) {
   return Math.hypot(x-a-t*dx,y-b-t*dy);
 }
 
-let checked = 0, worst = 0;
-for (const [type,turnDirection] of [['straight','left'],['quarter_turn','left'],['quarter_turn','right']]) {
+let checked = 0, worst = 0, cases = 0;
+const layouts=[['straight','left'],['quarter_turn','left'],['quarter_turn','right']];
+for (const type of ['quarter_winder','half_winder'])
+  for (const hand of ['left','right'])
+    for (const shape of ['square','faceted']) layouts.push([type,hand,shape]);
+for (const [type,turnDirection,outerShape='square'] of layouts) {
   for (const nosing of [-60,0,25,100]) {
     const project = structuredClone(starterProject);
-    Object.assign(project.stair,{type,turnDirection,nosing,riserBoards:'closed',riserJoint:'housed'});
+    Object.assign(project.stair,{type,turnDirection,outerShape,nosing,riserBoards:'closed',riserJoint:'housed'});
     const workshop = buildWorkshop(generateStairGeometry(project.stair),project);
+    assert(workshop.treads.length>0,`${type} ${turnDirection} ${outerShape} ${nosing}`);
     assert.deepEqual(workshop.riserJoinery.issues.filter(i=>i.level==='error'),[]);
     const expected = new Set(workshop.riserJoinery.pockets.map(p=>p.id));
     for (const tread of workshop.treads) {
       const faces = workshop.riserJoinery.pockets.filter(p=>p.hostId===tread.id).map(p=>p.face);
       assert.deepEqual(faces.sort(),['top','underside'],tread.id);
     }
-    const jobs = workshop.housings.beams.map(beam=>compileHousingJob(beam,project.cam));
+    const jobs = workshop.housings.beams.filter(b=>b.pockets.length).map(beam=>compileHousingJob(beam,project.cam));
     for (const part of workshop.parts.filter(p=>['tread','landing'].includes(p.kind))) {
       for (const result of riserFaceResults(part,project,workshop.riserJoinery.issues)) {
         assert.ok(result.job,result.problem);
@@ -68,6 +73,7 @@ for (const [type,turnDirection] of [['straight','left'],['quarter_turn','left'],
       }
     }
     assert.equal(expected.size,0,'Missing toolpaths: '+[...expected].join(', '));
+    cases++;
   }
 }
-console.log(`LinuxCNC: ${checked} liphoeken binnen het freesbereik op lipdiepte, grootste hartlijnafstand ${worst.toFixed(4)} mm.`);
+console.log(`LinuxCNC: ${cases} configuraties, ${checked} liphoeken binnen het freesbereik op lipdiepte, grootste hartlijnafstand ${worst.toFixed(4)} mm.`);

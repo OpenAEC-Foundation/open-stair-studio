@@ -1,6 +1,6 @@
 import { prism, tube } from './components/solids.js';
 import { treadClearanceIssue } from './stair-validity.js';
-import { housedStraightRisers, nosingStrip, riserStock } from './timber-riser.js';
+import { housedRisers, nosingStrip, riserStock } from './timber-riser.js';
 import { buildTimberBalustrade } from './timber-balustrade.js';
 
 export const detailDefaults = { railSide:'none', railHeight:950, riserBoards:'none', riserThickness:18,
@@ -179,7 +179,7 @@ function riserParts(stair,geometry) {
       return s+p.x*q.y-q.x*p.y;
     },0))/2;
     parts.push({id,label:'Houten stootbord',kind:'plate',material:'timber',heightMm:top-bottom,...riserStock(points,direction,top-bottom,stair.riserThickness),
-      thicknessMm:stair.riserThickness,volumeM3:planArea*(top-bottom)/1e9,faces:prism(points,bottom,top)});
+      planPoints:points,direction,thicknessMm:stair.riserThickness,volumeM3:planArea*(top-bottom)/1e9,faces:prism(points,bottom,top)});
   };
   // Standard boards stand vertically against the lower tread back and below
   // the next tread. The optional manual profile remains an explicit sloped detail.
@@ -226,9 +226,9 @@ function riserParts(stair,geometry) {
   for(const flight of geometry.flights) {
     const treads=geometry.treads.filter(t=>t.flightIndex===flight.index);
     for(const t of treads) {
-      const offset=housedStraightRisers(stair)?stair.wellatWidth:Math.max(0,stair.nosing-stair.riserThickness);
+      const offset=housedRisers(stair)?stair.wellatWidth:Math.max(0,stair.nosing-stair.riserThickness);
       if(geometry.dimensions.family.winder){
-        const footprint=strip(t.points,t.frontEdge[0],t.direction,0,stair.riserThickness);
+        const footprint=t.riserSeat?.points??strip(t.points,t.frontEdge[0],t.direction,0,stair.riserThickness);
         add(t.id+'-SB',footprint,t.elevation-rise,t.elevation-t.thickness,t.direction);
       } else addStraight(t,flight);
       if(stair.wellatType==='chamfered') {
@@ -240,6 +240,11 @@ function riserParts(stair,geometry) {
     if (!last) continue;
     const landing=geometry.landings.find(item=>item.level===last.level+1);
     const endZ=landing?landing.elevation-landing.thickness:last.elevation+rise;
+    const terminalId=`${stair.mark}-V${flight.index+1}-UIT-SB`;
+    if(last.exitRiserSeat){
+      add(terminalId,last.exitRiserSeat.points,last.elevation,endZ,last.exitRiserSeat.direction);
+      continue;
+    }
     let ref,direction=last.direction;
     if(geometry.dimensions.family.winder) {
       const terminals=[1,-1].map(side=>geometry.stringers.filter(b=>b.side===side).at(-1)?.vertices?.[1]);
@@ -262,7 +267,7 @@ function riserParts(stair,geometry) {
         y:ref.y+normal.y*side*half+direction.y*along});
       footprint=[point(-1,0),point(-1,thickness),point(1,thickness),point(1,0)];
     }
-    add(`${stair.mark}-V${flight.index+1}-UIT-SB`,footprint,last.elevation,endZ,direction);
+    add(terminalId,footprint,last.elevation,endZ,direction);
   }
   return parts;
 }

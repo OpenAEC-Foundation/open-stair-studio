@@ -85,6 +85,19 @@ function segmentGap(a, b, c, d) {
   return Math.min(pointToSegment(a,c,d),pointToSegment(b,c,d),pointToSegment(c,a,b),pointToSegment(d,a,b));
 }
 
+// A tapered tread (including the roots of its stringer tongues) can be
+// concave. A groove must survive cutting that final outline from the blank.
+function insideFinishedContour(mouth, contour) {
+  const p=mouth[0];
+  let inside=false;
+  for (let i=0;i<contour.length;i++) {
+    const a=contour[i], b=contour[(i+1)%contour.length];
+    if ((a.y>p.y)!==(b.y>p.y) && p.x<a.x+(p.y-a.y)*(b.x-a.x)/(b.y-a.y)) inside=!inside;
+    if (mouth.some((c,j)=>segmentGap(a,b,c,mouth[(j+1)%mouth.length])<=EPS)) return false;
+  }
+  return inside;
+}
+
 // Offset each edge by one tool radius. Each adjacent pair meets at the
 // corresponding cutter-centre corner, an exact construction for convex loops.
 function insetCorners(loop, radius, id) {
@@ -125,11 +138,13 @@ function planPocket(pocket, face, stock, cam) {
   if (pocket.openEdge) throw new Error(`${pocket.id}: een randopen huis vereist een aparte opspanning en bewerking.`);
   const loop = convexLoop(pocket.contour,pocket.id);
   if (loop.points.some(p => clearance(face.planes,p) < -EPS)) throw new Error(`${pocket.id}: het huis valt buiten het binnenvlak.`);
+  if (pocket.riserId && stock.partContour && !insideFinishedContour(loop.points,stock.partContour))
+    throw new Error(`${pocket.id}: de groef doorsnijdt de afgewerkte buitencontour.`);
   // Tolerance compensates the final coordinate rounding to 4 decimal places.
   const radius = cam.toolDiameter/2;
   const ring = insetCorners(loop,radius+.0001,pocket.id);
   // Riser grooves have end clearance for a square tongue and round cutter.
-  // The four tongue corners must lie in the rounded region actually cleared.
+  // Every tongue corner must lie in the rounded region actually cleared.
   if (pocket.riserId) {
     const local = point => {
       const v = {x:point.x-stock.frame.origin.x,y:point.y-stock.frame.origin.y,z:point.z-stock.frame.origin.z};

@@ -4,6 +4,10 @@
   export let results=[],downloadFile,model;
   const points=loop=>loop.map(p=>p.x+','+p.y).join(' ');
   const range=(loop,axis)=>[Math.min(...loop.map(p=>p[axis])),Math.max(...loop.map(p=>p[axis]))].map(mm).join(' – ');
+  const oblique = loop => loop.some((a,i) => {
+    const b=loop[(i+1)%loop.length];
+    return Math.abs(a.x-b.x)>.001 && Math.abs(a.y-b.y)>.001;
+  });
   function save({setup,job},extension) {
     if(!job) return;
     const stem=housingFileStem(setup,job.metadata);
@@ -32,6 +36,9 @@
       </svg>
       <table><thead><tr><th>Stootbord</th><th>X van – tot (mm)</th><th>Y van – tot (mm)</th><th>Z bodem (mm)</th></tr></thead>
         <tbody>{#each s.pockets as p}<tr><td>{p.riserId}</td><td>{range(p.contour,'x')}</td><td>{range(p.contour,'y')}</td><td>{mm(-p.depth)}</td></tr>{/each}</tbody></table>
+      {#each s.pockets.filter(p=>oblique(p.contour)) as p}
+        <p><b>{p.riserId} · hoekpunten G54 (X / Y in mm)</b><br/>{p.contour.map(q=>mm(q.x)+' / '+mm(q.y)).join(' · ')}</p>
+      {/each}
       <p>Frees de groeven vóór de buitencontour. Leg het aangegeven vlak boven. Stel X0 Y0 in op de linkeronderhoek van de rechthoekige plank van {mm(s.length)} × {mm(s.width)} mm en Z0 op het houtoppervlak.
         {s.nose?'De blauwe lijn geeft de neus aan.':'X volgt de X-as van het trapmodel.'}
         Frees Ø {mm(model.cam.toolDiameter)} mm · ronde groefeinden.</p>
@@ -48,5 +55,10 @@
   .blank{fill:none;stroke:#73818b;stroke-dasharray:4 3}.wood{fill:#efdfc0;stroke:#6b563c}.slot{fill:#96cbbd;stroke:#286d60}.nose{fill:none;stroke:#315b86}
   table{width:100%;border-collapse:collapse;font-size:11px;text-align:left}th,td{padding:4px;border-bottom:1px solid #cbd2d3}
   .issue{color:#873f23}
-  @media print{.commands{display:none}svg{height:37mm}.groove{print-color-adjust:exact}}
+  @media print {
+    .commands{display:none}
+    .groove{padding:2mm 3mm;margin:2mm 0;print-color-adjust:exact}
+    svg{height:34mm;margin:1.5mm auto}
+    p{margin:1mm 0}
+  }
 </style>

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { starterProject } from '../src/stair.js';
 import { generateWinderGeometry, winderIssues } from '../src/winder.js';
+import { buildStairDetails } from '../src/stair-details.js';
 
 const base = starterProject.stair;
 const close = (a,b,reason,tolerance = 1e-6) => assert(Math.abs(a-b) <= tolerance, `${reason}: ${a} ≠ ${b}`);
@@ -130,4 +131,50 @@ for (const bad of [{entrySteps:80},{risers:3},{width:3500},{turnDirection:'up'},
   assert(winderIssues({...sample,...bad}).length);
   assert.equal(generateWinderGeometry({...sample,...bad}).treads.length,0);
 }
+// Winder plan contours may have a concave inner mitre. Check the complete
+// body, including each intervening rail vertex, on both supporting treads.
+function contains(loop,p) {
+  let inside=false;
+  for(let i=0;i<loop.length;i++){
+    const a=loop[i],b=loop[(i+1)%loop.length];
+    if(Math.abs(cross(a,b,p))<=1e-6*distance(a,b) &&
+        (p.x-a.x)*(p.x-b.x)+(p.y-a.y)*(p.y-b.y)<=1e-6) return true;
+    if((a.y>p.y)!==(b.y>p.y) && p.x<a.x+(b.x-a.x)*(p.y-a.y)/(b.y-a.y)) inside=!inside;
+  }
+  return inside;
+}
+let grooved=0;
+for(const type of ['quarter_winder','half_winder']) for(const turnDirection of ['left','right'])
+for(const outerShape of ['square','faceted']) for(const nosing of [-60,-25,0,25,100])
+for(const wellatType of ['none','chamfered']){
+  const s={...base,type,turnDirection,outerShape,nosing,wellatType,riserJoint:'housed',riserBoards:'closed'};
+  const family={winder:true}, g=generateWinderGeometry(s,family);
+  const nominal=generateWinderGeometry({...s,riserJoint:'butt'},family);
+  const details=buildStairDetails(s,g), boards=details.filter(p=>p.role==='riser');
+  assert.equal(boards.length,s.risers);
+  const lip=wellatType==='chamfered'?s.wellatWidth:0;
+  for(const [i,board] of boards.entries()){
+    const upper=g.treads[i],lower=g.treads[i-1],d=board.direction;
+    verifySimple(board.planPoints);
+    const dot=p=>p.x*d.x+p.y*d.y;
+    const run=board.planPoints.map(dot);
+    close(Math.max(...run)-Math.min(...run),s.riserThickness,'two parallel faces of winding riser');
+    for(const [k,a] of board.planPoints.entries()){
+      const b=board.planPoints[(k+1)%run.length];
+      for(const fraction of [0,.25,.5,.75]) {
+        const point={x:a.x+(b.x-a.x)*fraction,y:a.y+(b.y-a.y)*fraction};
+        for(const host of [upper,lower].filter(Boolean)) assert(contains(host.points,point),board.id+' body misses '+host.id);
+      }
+    }
+    if(!upper) continue;
+    close(upper.goingAtWalkline,nominal.treads[i].goingAtWalkline,'machining keeps nominal going');
+    close(upper.eligibleAt170Mm,nominal.treads[i].eligibleAt170Mm,'machining keeps effective going band');
+    close(dot(upper.frontEdge[0])+lip,Math.min(...run),'leading edge tracks actual riser and nosing strip');
+    const strip=details.find(part=>part.id===upper.id+'-WL');
+    assert.equal(!!strip,!!lip);
+    if(strip) close(Math.max(...strip.faces.flat().map(dot)),Math.min(...run),'strip terminates on riser');
+  }
+  grooved++;
+}
+console.log(`${grooved} gesloten varianten gecontroleerd op de volledige stootbordoplegging, neus, wellat en klimlijn.`);
 console.log(`${checked} verdreven trapvarianten gecontroleerd op spiegeling, vereffening, hoekpunten, sluitende contouren, maatvoering en materiaal.`);

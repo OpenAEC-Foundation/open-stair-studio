@@ -203,8 +203,8 @@ function writeModel(api, sid, model, geometry) {
   function treadSolid(tread) {
     const baseZ = tread.elevation - tread.thickness;
     if(profiledTimber) {
-      // Coordination bodies stop at the inner stringer face. The workshop
-      // contour also includes housed tongues, whose sockets are machined in CAM.
+      // Joined stairs already carry the workshop contour, including the
+      // full-height tongues alongside the profiled edge of each tapered tread.
       const body=tread.noseDetail ? tread : profileTimberTread(tread,stair);
       if(!body.noseDetail) throw new Error('Ongeldige profielmaat aan de voorrand van '+tread.id+'.');
       const vertices=new Map();
@@ -297,6 +297,7 @@ function writeModel(api, sid, model, geometry) {
   const treadObjects = [];
   const joinedStrings = [];
   const joinedSteps = [];
+  const joineryHosts = new Map();
   const partRelations = [];
   function reservation(id, role, solid, parentPlacement) {
     const object = e(IFC.IFCBUILDINGELEMENTPROXY, api.CreateIFCGloballyUniqueId(sid), null,
@@ -334,6 +335,7 @@ function writeModel(api, sid, model, geometry) {
           identifier(tread.id), enumValue('USERDEFINED'));
         parts.push(object);
         joinedSteps.push(object);
+        joineryHosts.set(tread.id, object);
       }
     }
     for (const beam of geometry.stringers.filter(item => item.flightIndex === flight.index)) {
@@ -345,6 +347,7 @@ function writeModel(api, sid, model, geometry) {
           identifier(beam.id), enumValue('STRINGER'));
         joinedStrings.push(object);
         parts.push(object);
+        joineryHosts.set(beam.id, object);
       }
       else solids.push(solid);
     }
@@ -390,6 +393,7 @@ function writeModel(api, sid, model, geometry) {
       localPlacement(stairPlacement), finishedBody(landing.id, solid), identifier(landing.id), enumValue('LANDING'));
     stairChildren.push(slab);
     landingObjects.push(slab);
+    if (joined) joineryHosts.set(landing.id, slab);
     if (!separateTreads) timberObjects.push(slab);
   }
   if (!separateTreads) {
@@ -452,6 +456,14 @@ function writeModel(api, sid, model, geometry) {
       text('Ontwerpcoördinatie van leuning of stootbord.'), label(detail.label),
       localPlacement(stairPlacement), detailSolid(detail), identifier(detail.id), enumValue(detail.role==='nosingStrip'?'MEMBER':predefined));
     stairChildren.push(obj);
+    // Keep the receiving part and the mating riser selectable in BIM even
+    // when an oblique end lands on a different stringer facet at a new nose position.
+    for (const pocket of detail.riserPockets ?? []) {
+      const host = joineryHosts.get(pocket.hostId);
+      if (!host) throw new Error('Ontbrekend IFC-onderdeel voor stootbordgroef '+pocket.id+'.');
+      partRelations.push(e(IFC.IFCRELCONNECTSELEMENTS, api.CreateIFCGloballyUniqueId(sid), null,
+        label(pocket.id), null, null, host, obj));
+    }
     const typeKey = `${detail.kind}:${detail.role}`;
     if (!typedDetails.has(typeKey)) typedDetails.set(typeKey, []);
     typedDetails.get(typeKey).push(obj);

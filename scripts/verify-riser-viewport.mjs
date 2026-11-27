@@ -21,9 +21,16 @@ function renderedVolume(partGeometry) {
   return volume;
 }
 
-for (const [turnDirection,nosing,noseProfile] of [['left',-60,'bevel'],['right',100,'round']]) {
+const cases=[
+  ['quarter_turn','left',-60,'bevel'],['quarter_turn','right',100,'round']
+];
+for(const type of ['quarter_winder','half_winder'])
+  for(const hand of ['left','right'])
+    for(const shape of ['square','faceted'])
+      for(const [nosing,profile] of [[-60,'bevel'],[0,'square'],[100,'round']]) cases.push([type,hand,nosing,profile,shape]);
+for (const [type,turnDirection,nosing,noseProfile,outerShape='square'] of cases) {
   const model=structuredClone(starterProject);
-  Object.assign(model.stair,{type:'quarter_turn',turnDirection,nosing,noseProfile,riserBoards:'closed',riserJoint:'housed'});
+  Object.assign(model.stair,{type,turnDirection,nosing,noseProfile,outerShape,riserBoards:'closed',riserJoint:'housed'});
   const workshop=buildWorkshop(generateStairGeometry(model.stair),model);
   const schedule=addTimberTakeoff(workshop,model.stair,workshop.detailParts);
   assert.deepEqual(workshop.riserJoinery.issues,[]);
@@ -32,7 +39,7 @@ for (const [turnDirection,nosing,noseProfile] of [['left',-60,'bevel'],['right',
       const part=schedule.parts.find(p=>p.id===host.id);
       const volume=renderedVolume({treads:[],landings:[],stringers:[],[key]:[host],
         riserJoinery:workshop.riserJoinery,housings:workshop.housings});
-      assert(Math.abs(volume-part.volume)<2e-7,host.id+' viewport '+volume+' versus '+part.volume);
+      assert(Math.abs(volume-part.volume)<2e-7,[type,turnDirection,outerShape,nosing,host.id,'viewport',volume,'versus',part.volume].join(' '));
     }
   }
 }

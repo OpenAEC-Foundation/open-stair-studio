@@ -1,3 +1,5 @@
+import { buildWinderRiserJoinery } from './winder-riser-joinery.js';
+
 const EPS = 1e-6;
 const dot = (a,b) => a.x*b.x + a.y*b.y + a.z*b.z;
 const sub = (a,b) => ({x:a.x-b.x,y:a.y-b.y,z:a.z-b.z});
@@ -82,12 +84,46 @@ function beamInterval(job,world,x0,x1,y,depth,lo,hi) {
   return [lo,hi];
 }
 
+// A perpendicular outgoing stringer can stand over one end of the landing
+// groove. Intersect its actual sawn faces with the cutter's X / Z band in
+// riser coordinates, including the level foot and the pitched underside.
+function landingGrooveSpan(beams,frame,x0,x1,z0,z1,lo,hi) {
+  let spans=[[lo,hi]];
+  for(const beam of beams) {
+    const faces=beam.meshFaces.map(face=>face.map(p=>local(frame,p)));
+    const box=bounds(faces.flat());
+    if(box[0]>=x1-EPS || box[1]<=x0+EPS || box[4]>=z1-EPS || box[5]<=z0+EPS) continue;
+    const section=[];
+    for(const face of faces) {
+      let polygon=face;
+      for(const [axis,limit,sign] of [['x',x0,1],['x',x1,-1],['z',z0,1],['z',z1,-1]]) {
+        const clipped=[];
+        polygon.forEach((a,i)=>{
+          const b=polygon[(i+1)%polygon.length],da=sign*(a[axis]-limit),db=sign*(b[axis]-limit);
+          if(da>=-EPS) clipped.push(a);
+          if((da>EPS && db< -EPS)||(da< -EPS && db>EPS)) {
+            const t=da/(da-db);
+            clipped.push({x:a.x+t*(b.x-a.x),y:a.y+t*(b.y-a.y),z:a.z+t*(b.z-a.z)});
+          }
+        });
+        polygon=clipped;
+      }
+      section.push(...polygon.map(p=>p.y));
+    }
+    if(!section.length) continue;
+    const start=Math.min(...section),end=Math.max(...section);
+    spans=spans.flatMap(([a,b])=>[[a,Math.min(b,start)],[Math.max(a,end),b]])
+      .filter(([a,b])=>b-a>EPS);
+  }
+  return spans.sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))[0] ?? [lo,lo];
+}
+
 export function buildRiserJoinery(geometry,stair,housings,detailParts) {
   const pockets=[],issues=[],result={parts:detailParts,pockets,issues};
   if(stair.riserBoards!=='closed'||stair.riserJoint!=='housed'||!geometry.treads.length) return result;
   const error=(code,message,riserId,hostId)=>issues.push({level:'error',code,message,riserId,hostId});
-  if(geometry.dimensions.family.winder||stair.riserPosition==='manual'){
-    error('riser-profile','Stootbordgroeven vragen verticale stootborden op rechte vluchten. Voor verdreven treden en het handmatige stootbordprofiel is dit detail nog niet uitgewerkt.');
+  if(stair.riserPosition==='manual'){
+    error('riser-profile','Stootbordgroeven vragen een verticaal stootbord. Kies de automatische stootbordpositie.');
     return result;
   }
   const grooveDepth=Number(stair.riserGrooveDepth??8),clearance=housings?.settings.clearance??0.4;
@@ -96,6 +132,8 @@ export function buildRiserJoinery(geometry,stair,housings,detailParts) {
     error('riser-settings','Controleer groefdiepte en passpeling van de stootbordverbinding.');
     return result;
   }
+  if(geometry.dimensions.family.winder)
+    return buildWinderRiserJoinery(geometry,stair,housings,detailParts,grooveDepth,clearance);
   const support=new Map();
   for(const flight of geometry.flights){
     const treads=geometry.treads.filter(t=>t.flightIndex===flight.index);
@@ -154,12 +192,15 @@ export function buildRiserJoinery(geometry,stair,housings,detailParts) {
       if(!host) return;
       const kind=host.frontEdge?'tread':'landing',face=isTopBoard?'underside':'top';
       const z=isTopBoard?h:0,depth=grooveDepth,travel=depth-Math.min(clearance/2,depth/4);
-      const rootMargin=12, end=rootMargin+endRelief;
+      const rootMargin=12;
+      const outgoing=terminal && kind==='landing' && isTopBoard
+        ? geometry.stringers.filter(beam=>beam.flightIndex===flight.index+1) : [];
+      const [lo,hi]=landingGrooveSpan(outgoing,riserFrame,x0,x1,z,z+depth,rootMargin,width-rootMargin);
       const loop=(a,b,c,e)=>rect(a,b,c,e).map(([x,y])=>world(x,y,z));
-      const groove=loop(x0,rootMargin,x1,width-rootMargin);
-      const tongue=loop(tx0,end,tx1,width-end);
+      const groove=loop(x0,lo,x1,hi);
+      const tongue=loop(tx0,lo+endRelief,tx1,hi-endRelief);
       const minRoof=kind==='tread'?Math.min(...groove.map(p=>roofAt(host,stair,p))):host.thickness;
-      if(width<=2*end || depth>=minRoof-EPS || !insideBoard(groove,host.points)){
+      if(hi-lo<=2*endRelief || depth>=minRoof-EPS || !insideBoard(groove,host.points)){
         noteError('riser-groove-stock','De stootbordgroef valt buiten het hout of door het oppervlak van '+host.id+'.',host.id);
         return;
       }
@@ -176,8 +217,10 @@ export function buildRiserJoinery(geometry,stair,housings,detailParts) {
         }
       }
       const inward={x:0,y:0,z:isTopBoard?1:-1};
-      const box=[tx0,tx1,end,width-end,isTopBoard?h:-travel,isTopBoard?h+travel:0];
-      register(host,kind,face,depth,groove,tongue,box,inward,(x1-x0)*(width-2*rootMargin));
+      const box=[tx0,tx1,lo+endRelief,hi-endRelief,isTopBoard?h:-travel,isTopBoard?h+travel:0];
+      if(lo>rootMargin+EPS || hi<width-rootMargin-EPS)
+        notes.push('De bordesgroef en bovenlip eindigen voor de voet van de uitgaande wang.');
+      register(host,kind,face,depth,groove,tongue,box,inward,(x1-x0)*(hi-lo));
     }
     horizontal(upper,true);
     horizontal(lower,false);
