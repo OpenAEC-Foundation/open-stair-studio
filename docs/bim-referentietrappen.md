@@ -62,6 +62,8 @@ Bij het inlezen als gebouwmodel telt Studio de werkelijk aan vloeren gekoppelde 
 
 Het [meetblad met doorsneden](../output/pdf/BIM-vergelijking-trappen.pdf) toont op gelijke schaal hoe het verschil in wel terugkomt in de treden en stootborden.
 
+**Ontvangst in Bonsai.** In Blender 4.5.10 LTS opende Bonsai het meegeleverde IFC4-bestand via de normale projectimport. Alle 33 fysieke onderdelen kregen een eigen Blender-mesh, samen 404 vlakken. De ontvangen vlucht ST-01-V1 bevatte zestien optredes en vijftien treden met een optrede van 0,1875 m en een aantrede van 0,220 m. Deze ontvangerproef geldt voor IFC4.
+
 Bij 51 proefposities in vloermateriaal en zeven in sparingen in de drie gebouwmodellen kwam de doorsnedetoets overeen met de verwachte uitkomst. De aanvullende regressie bevat onder meer een inspringing van 3 mm, een vloereiland onder een trede, een raaklijn en een onvolledige contour. [Proeven met vloerdoorsneden](../scripts/verify-host-section-fit.mjs)
 
 **Plaatsing in het FZK-Haus.** In vloer Slab-033 (#59290) loopt sparing #59365 van Z = 2500 tot 2700 mm. De vier ingelezen hoekpunten wijken maximaal 0,00012 mm af van een afzonderlijke IfcOpenShell-meting. Bij de eigen steektrap met verdiepingshoogte 2700 mm, breedte 880 mm, zestien optredes en aantrede 220 mm is het snijpeil 2600 mm. Met projectnulpunt (6390,185 / 2100 / 0) mm en rotatie 0° past de doorsnede in de sparing. Met X = 2190,185 mm meldt Studio een doorsnijding met Slab-033. De conclusie betreft de horizontale doorsnede op het getoetste peil.
