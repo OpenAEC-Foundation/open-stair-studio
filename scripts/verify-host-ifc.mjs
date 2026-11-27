@@ -44,6 +44,22 @@ const relation=api.CreateIfcEntity(hostId,IFC.IFCRELVOIDSELEMENT,
 api.WriteLine(hostId,opening);
 api.WriteLine(hostId,relation);
 const hostBytes=api.SaveModel(hostId);
+const guid=()=>api.CreateIFCGloballyUniqueId(hostId);
+function hostPart(type, name, predefined, shape) {
+  return make(type,guid(),null,label(name),null,null,slab.ObjectPlacement,shape,null,{type:3,value:predefined});
+}
+function voidHost(element, opening) {
+  api.WriteLine(hostId,make(IFC.IFCRELVOIDSELEMENT,guid(),null,null,null,element,opening));
+}
+const standardSlab=hostPart(IFC.IFCSLABSTANDARDCASE,'Kanaalplaatvloer','FLOOR',slab.Representation);
+const standardOpening=hostPart(IFC.IFCOPENINGSTANDARDCASE,'Sparing kanaalplaat','OPENING',openingShape);
+voidHost(standardSlab,standardOpening);
+const wall=hostPart(IFC.IFCWALL,'Gevel','STANDARD',null);
+const wallOpening=hostPart(IFC.IFCOPENINGELEMENT,'Raamsparing','OPENING',openingShape);
+voidHost(wall,wallOpening);
+// A floor check must also tolerate an opening with no valid host link.
+api.WriteLine(hostId,hostPart(IFC.IFCOPENINGELEMENT,'Ongekoppelde sparing','OPENING',openingShape));
+const mixedBytes=api.SaveModel(hostId);
 api.CloseModel(hostId);
 if(process.argv[2]==='--fixture'&&process.argv[3])writeFileSync(process.argv[3],hostBytes);
 const host=await readHostIfc(hostBytes,'testgebouw.ifc');
@@ -54,6 +70,13 @@ assert.equal(host.openings.length,1);
 assert.equal(host.voids.length,1);
 assert(host.openings[0].bounds);
 assert.equal(host.openings[0].triangles.length,12);
+const mixed=await readHostIfc(mixedBytes,'vloer-en-gevel.ifc');
+assert.deepEqual(mixed.slabs.map(s=>s.id).sort(),[slabId,standardSlab.expressID].sort());
+assert.deepEqual(mixed.openings.map(o=>o.id).sort(),[opening.expressID,standardOpening.expressID].sort());
+assert.deepEqual(mixed.voids.sort((a,b)=>a.slabId-b.slabId),[
+  {slabId,openingId:opening.expressID},{slabId:standardSlab.expressID,openingId:standardOpening.expressID}
+]);
+assert(mixed.openings.every(o=>o.triangles?.length===12));
 assert.equal(checkHostFit(geometry,host).status,'outside');
 assert.equal(sectionLoops(host.openings[0].triangles,1420).length,1);
 assert(sectionSegments(viewportTriangles(geometry),1420).length>0);
@@ -82,4 +105,4 @@ const loops=sectionLoops(walls,5);
 assert.equal(loops.length,1);
 assert(pointInLoops([.5,2],loops));
 assert(!pointInLoops([2,2],loops));
-console.log('Host IFC4: vloer gemesht; sparingsrelatie en planpassing gecontroleerd.');
+console.log('Host IFC4: gewone en StandardCase-vloersparingen, filtering van gevel- en ongekoppelde openingen en planpassing gecontroleerd.');

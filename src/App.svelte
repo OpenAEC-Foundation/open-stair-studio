@@ -347,7 +347,7 @@
     hostLoading=true;
     try {
       hostContext=await readHostIfc(new Uint8Array(await file.arrayBuffer()),file.name);
-      notify(`${hostContext.slabs.length} ${hostContext.slabs.length===1?'vloer':'vloeren'} en ${hostContext.openings.length} ${hostContext.openings.length===1?'sparing':'sparingen'} ingelezen`);
+      notify(`${hostContext.slabs.length} ${hostContext.slabs.length===1?'vloer':'vloeren'} en ${hostContext.openings.length} ${hostContext.openings.length===1?'gekoppelde vloersparing':'gekoppelde vloersparingen'} ingelezen`);
     } catch(error) {hostContext=null;notify(error.message);}
     finally {hostLoading=false;}
   }
@@ -665,7 +665,7 @@
           <div class="production-head"><div><span class="eyebrow">OPENBIM · PROJECTOVERDRACHT</span><h1>Trap in gebouwcontext</h1><p>IFC4-coördinatie met typen, materialen, classificatie en projectplaatsing.</p></div><button class="action-btn" onclick={()=>exportIfc()}><Icon name="ifc.export" /> IFC4 exporteren</button><button class="action-btn" onclick={()=>exportIfc('ifcx')}><Icon name="ifc.export" /> IFCX alpha exporteren</button></div>
           <div class="production-summary"><div><span>Trapobject</span><b>{model.stair.mark} · {model.stair.name}</b></div><div><span>Projectnulpunt</span><b>{model.bim.originAgreed ? 'Afgestemd' : 'Nog af te stemmen'}</b></div><div><span>IFC-schema</span><b>IFC4</b></div><div><span>Gebouwmodel</span><b>{hostContext?.filename ?? 'Niet ingelezen'}</b></div></div>
           <div class="property-section"><h3>Gebouwmodel en sparing</h3><label for="host-ifc-file">IFC-bestand inlezen</label><input id="host-ifc-file" type="file" accept=".ifc,application/x-step" onchange={openHostIfc} disabled={hostLoading} />
-            {#if hostContext}<p>{hostContext.slabs.length} {hostContext.slabs.length===1?'vloer':'vloeren'} · {hostContext.openings.length} {hostContext.openings.length===1?'sparing':'sparingen'} · {hostContext.voids.length} vloersparingsrelaties</p>{/if}
+            {#if hostContext}<p>{hostContext.slabs.length} {hostContext.slabs.length===1?'vloer':'vloeren'} · {hostContext.openings.length} {hostContext.openings.length===1?'gekoppelde vloersparing':'gekoppelde vloersparingen'}</p>{/if}
             <p role="status"><b>{hostFit.status==='precheck'?'Planpassing voorlopig':hostFit.status==='outside'?'Sparingscontour controleren':'Hostcontrole open'}</b> · {hostFit.message}</p>
             <small>De toets snijdt trap en gekoppelde sparing op het midden van elk vloerpeil. Controle van vrije hoogte, draagkracht, vloerhelling en ankers volgt projectmatig.</small>
           </div>

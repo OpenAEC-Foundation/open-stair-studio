@@ -2,6 +2,12 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.21
+
+- De BIM-werkruimte leest de sparingen die aan een vloer zijn gekoppeld. Voor de twee openbare Archicad-modellen van KIT komen de tellingen overeen met IfcOpenShell. FZK-Haus heeft vier vloerplaten met één vloersparing, het Institute-model heeft 26 vloerplaten met vier vloersparingen.
+- De planpassing vergelijkt volledige doorsneden van trap, vloer en vloersparing op het middenpeil van de vloer. Zo zijn ook smalle inspringingen, eilanden van vloermateriaal en openingen die elkaar overlappen te beoordelen. Bij onvoldoende geometrie blijft de uitkomst open.
+- Het [meetblad met doorsneden](https://github.com/OpenAEC-Foundation/open-stair-studio/blob/v0.13.21/output/pdf/BIM-vergelijking-trappen.pdf) zet de steektrap van Studio en die van De Vries op gelijke schaal naast elkaar.
+
 ## Nieuw in 0.13.20
 
 - In IFC4 kun je houten treden, stootborden en bomen afzonderlijk selecteren en per vlucht terugvinden. De standaard IFC-eigenschappen geven de optredes, treden en beschikbare loopmaten. Nettovolumes staan op de fysieke houten onderdelen. Overeenkomstige onderdelen behouden hun GlobalId bij herexport en ontwerpwijzigingen.

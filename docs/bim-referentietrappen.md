@@ -58,6 +58,14 @@ Het Duplex-bestand laat zien waarom een uitleestest ook de vorm moet nameten. De
 
 ## Zelf nameten
 
+Bij het inlezen als gebouwmodel telt Studio de werkelijk aan vloeren gekoppelde sparingen. Het KIT FZK-Haus bevat vier IFC-vloerplaten en zeventien openingen in het hele gebouw. Eén opening hoort bij een vloerplaat. In het Institute-model gaat het om 26 vloerplaten en vier vloersparingen uit 287 gebouwopeningen. De aantallen zijn zowel via IfcOpenShell als via de BIM-werkruimte gecontroleerd. [Gebouwmodellen van KIT](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)
+
+Het [meetblad met doorsneden](../output/pdf/BIM-vergelijking-trappen.pdf) toont op gelijke schaal hoe het verschil in wel terugkomt in de treden en stootborden.
+
+Bij 51 proefposities in vloermateriaal en zeven in sparingen in de drie gebouwmodellen kwam de doorsnedetoets overeen met de verwachte uitkomst. De aanvullende regressie bevat onder meer een inspringing van 3 mm, een vloereiland onder een trede, een raaklijn en een onvolledige contour. [Proeven met vloerdoorsneden](../scripts/verify-host-section-fit.mjs)
+
+**Plaatsing in het FZK-Haus.** In vloer Slab-033 (#59290) loopt sparing #59365 van Z = 2500 tot 2700 mm. De vier ingelezen hoekpunten wijken maximaal 0,00012 mm af van een afzonderlijke IfcOpenShell-meting. Bij de eigen steektrap met verdiepingshoogte 2700 mm, breedte 880 mm, zestien optredes en aantrede 220 mm is het snijpeil 2600 mm. Met projectnulpunt (6390,185 / 2100 / 0) mm en rotatie 0° past de doorsnede in de sparing. Met X = 2190,185 mm meldt Studio een doorsnijding met Slab-033. De conclusie betreft de horizontale doorsnede op het getoetste peil.
+
 Het vergelijkingsmodel van de gesloten steektrap is meegeleverd als [bewerkbaar project](../examples/bim-steektrap-vergelijking.oss.json), [IFC4](../examples/ST-01-coordinatiemodel.ifc) en [IFCX alpha](../examples/ST-01-coordinatiemodel.ifcx). De bestanden zijn vanuit de BIM-werkruimte gedownload. Voor alle 33 fysieke onderdelen zijn de identiteit, de omhulling in wereldcoördinaten en het opgegeven nettovolume uit beide bestanden gecontroleerd tegen de geometrie in IfcOpenShell.
 
 De onafhankelijke uitwisseltest vergelijkt daarnaast acht eigen IFC4/IFCX-modelparen, waaronder een kwartbordes, verdreven trappen en een opstelling met glas, staal, een boomloze trap en een vluchttrap. Ze vergelijkt de begrenzing en het volume per fysiek onderdeel. Dezelfde IFC4-modellen leveren de maatstaf voor de IFCX-conversie. De fabrikantbestanden hierboven leveren een afzonderlijke vergelijking van de ontwerpen. [Uitwisseltest](../scripts/verify-ifcx-independent.py) · [Test van de BIM-knoppen en downloads](../scripts/verify-bim-downloads.py)

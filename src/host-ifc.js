@@ -1,9 +1,9 @@
 import * as IFC from 'web-ifc';
-import {sectionLoops,sectionSegments,pointInLoops,viewportTriangles} from './host-section.js';
+import clipping from 'polygon-clipping';
+import {sectionArea,stairBodyTriangles} from './host-section.js';
 
 const MAX_BYTES=120*1024*1024;
-const EPS=0.01;
-const MAX_OPENING_TRIANGLES=100000;
+const MAX_ELEMENT_TRIANGLES=100000;
 const MAX_TOTAL_TRIANGLES=200000;
 
 export async function readHostIfc(bytes, filename='gebouw.ifc') {
@@ -18,17 +18,27 @@ export async function readHostIfc(bytes, filename='gebouw.ifc') {
   const id=api.OpenModel(bytes);
   if(id<0) throw new Error('Het IFC-gebouwmodel kon niet worden geopend.');
   try {
-    const entities=type=>{
-      const ids=api.GetLineIDsWithType(id,type);
-      return Array.from({length:ids.size()},(_,i)=>api.GetLine(id,ids.get(i)));
+    const idsOf=type=>{
+      const ids=api.GetLineIDsWithType(id,type,true);
+      return Array.from({length:ids.size()},(_,i)=>ids.get(i));
     };
-    const slabs=entities(IFC.IFCSLAB), openings=entities(IFC.IFCOPENINGELEMENT);
-    if(slabs.length+openings.length>1000) throw new Error('Te veel vloeren of sparingen voor deze eerste hostcontrole.');
+    const slabIds=new Set(idsOf(IFC.IFCSLAB));
+    const openingIds=new Set(idsOf(IFC.IFCOPENINGELEMENT));
+    const floorOpeningIds=new Set();
+    const voids=[];
+    for (const relationId of idsOf(IFC.IFCRELVOIDSELEMENT)) {
+      const relation=api.GetLine(id,relationId);
+      const slabId=relation.RelatingBuildingElement?.value, openingId=relation.RelatedOpeningElement?.value;
+      if (!slabIds.has(slabId) || !openingIds.has(openingId)) continue;
+      voids.push({slabId,openingId});
+      floorOpeningIds.add(openingId);
+    }
+    if(slabIds.size+floorOpeningIds.size>1000) throw new Error('Te veel vloeren of vloersparingen voor deze eerste hostcontrole.');
     let capturedTriangles=0;
-    function meshInfo(entity, keepTriangles=false) {
+    function meshInfo(entity) {
       const mesh=api.GetFlatMesh(id,entity.expressID,true);
       const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
-      let triangles=keepTriangles?[]:null;
+      let triangles=[];
       try {
         for(let i=0;i<mesh.geometries.size();i++) {
           const placed=mesh.geometries.get(i);
@@ -48,8 +58,11 @@ export async function readHostIfc(bytes, filename='gebouw.ifc') {
             }
             if(triangles){
               const indices=api.GetIndexArray(geometry.GetIndexData(),geometry.GetIndexDataSize());
-              if(triangles.length+indices.length/3>MAX_OPENING_TRIANGLES ||
-                capturedTriangles+indices.length/3>MAX_TOTAL_TRIANGLES) triangles=null;
+              if(triangles.length+indices.length/3>MAX_ELEMENT_TRIANGLES ||
+                capturedTriangles+indices.length/3>MAX_TOTAL_TRIANGLES) {
+                capturedTriangles-=triangles.length;
+                triangles=null;
+              }
               else {
                 capturedTriangles+=indices.length/3;
                 for(let j=0;j+2<indices.length;j+=3)
@@ -61,48 +74,76 @@ export async function readHostIfc(bytes, filename='gebouw.ifc') {
       } finally {mesh.delete?.();}
       return Number.isFinite(min[0])?{bounds:{min,max},triangles}:null;
     }
-    const item=(entity,opening=false)=>({id:entity.expressID,name:entity.Name?.value??'',type:entity.type,
-      ...(meshInfo(entity,opening)??{bounds:null,triangles:null})});
-    const voids=entities(IFC.IFCRELVOIDSELEMENT).map(relation=>({
-      slabId:relation.RelatingBuildingElement?.value,openingId:relation.RelatedOpeningElement?.value
-    }));
-    return {filename,schema:api.GetModelSchema(id),slabs:slabs.map(entity=>item(entity)),
-      openings:openings.map(entity=>item(entity,true)),voids};
+    const item=entity=>({id:entity.expressID,name:entity.Name?.value??'',type:entity.type,
+      ...(meshInfo(entity)??{bounds:null,triangles:null})});
+    // Reserve the existing mesh budget for referenced openings before retaining floor bodies.
+    const openings=Array.from(floorOpeningIds,openingId=>item(api.GetLine(id,openingId)));
+    const slabs=Array.from(slabIds,slabId=>item(api.GetLine(id,slabId)));
+    return {filename,schema:api.GetModelSchema(id),slabs,openings,voids};
   } finally {api.CloseModel(id);}
 }
 
-// Check the stair section at the middle of each imported floor against the
-// actual opening section. This remains a geometric precheck, not a load or
-// headroom assessment.
+function withinFloorBounds(stairAreas,{min,max}) {
+  const plan=[[min[0],min[1]],[max[0],min[1]],[max[0],max[1]],[min[0],max[1]]];
+  return clipping.intersection(clipping.union(...stairAreas),[plan]);
+}
+
+// Positive-area overlap denotes interference. Shared edges and vertices are allowed.
+// Openings of one floor form a union, while inner rings of one opening represent islands.
+function fitAtLevel(bodies,slab,openings,bim,transform) {
+  const z=(slab.bounds.min[2]+slab.bounds.max[2])/2;
+  const sections=bodies.map(body=>sectionArea(body,z-Number(bim.originZ??0),transform));
+  if(sections.some(area=>area===null))return 'unknown';
+  const stairAreas=sections.filter(area=>area.length);
+  if(!stairAreas.length)return 'separate';
+  const within=withinFloorBounds(stairAreas,slab.bounds);
+  if(!within.length)return 'separate';
+  let incomplete=false;
+  const voidAreas=[];
+  for(const opening of openings){
+    if(opening.bounds&&(z<opening.bounds.min[2]||z>opening.bounds.max[2]))continue;
+    const area=opening.triangles?.length ? sectionArea(opening.triangles,z) : null;
+    if(area===null)incomplete=true;
+    else if(area.length)voidAreas.push(area);
+  }
+  const uncovered=clipping.difference(within,...voidAreas);
+  if(!uncovered.length)return 'precheck';
+  // The box limits the search. Its interior outside a concave slab is empty space.
+  if(!slab.triangles?.length)return 'unknown';
+  const material=sectionArea(slab.triangles,z);
+  if(material===null)return 'unknown';
+  if(material.length&&clipping.intersection(uncovered,material).length)return incomplete?'unknown':'outside';
+  if(voidAreas.some(area=>clipping.intersection(within,area).length))return 'precheck';
+  return incomplete?'unknown':'separate';
+}
+
+// Compare the actual planar sections at the middle elevation of each imported floor.
 export function checkHostFit(geometry,host,bim={}) {
   if(!host) return {status:'unknown',message:'Geen IFC-gebouwmodel ingelezen.'};
   const angle=Number(bim.originRotationDeg??0)*Math.PI/180;
   const c=Math.cos(angle),s=Math.sin(angle);
   const transform=p=>[Number(bim.originX??0)+c*p[0]-s*p[1],
     Number(bim.originY??0)+s*p[0]+c*p[1]];
-  const triangles=viewportTriangles({...geometry,componentParts:geometry.landingFrame??[]});
-  let checked=0;
+  const bodies=stairBodyTriangles({...geometry,componentParts:geometry.componentParts??geometry.landingFrame??[]});
+  let checked=0,unresolved;
   for(const slab of host.slabs){
-    if(!slab.bounds)continue;
-    const z=(slab.bounds.min[2]+slab.bounds.max[2])/2;
-    const localZ=z-Number(bim.originZ??0);
-    const segments=sectionSegments(triangles,localZ);
-    const samples=segments.flatMap(([a,b])=>[a,b,
-      [a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25],
-      [(a[0]+b[0])/2,(a[1]+b[1])/2],
-      [a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75]])
-      .map(transform).filter(p=>p[0]>=slab.bounds.min[0]-EPS&&p[0]<=slab.bounds.max[0]+EPS&&
-        p[1]>=slab.bounds.min[1]-EPS&&p[1]<=slab.bounds.max[1]+EPS);
-    if(!samples.length)continue;
-    checked++;
+    if(!slab.bounds){unresolved=slab;continue;}
     const openings=host.voids.filter(r=>r.slabId===slab.id)
-      .map(r=>host.openings.find(o=>o.id===r.openingId)).filter(Boolean);
-    if(!openings.length)return {status:'outside',message:`De trap snijdt vloer ${slab.name||slab.id}; er is geen gekoppelde sparing.`};
-    const loops=openings.map(opening=>opening.triangles?.length?sectionLoops(opening.triangles,z):[]);
-    if(loops.some(item=>!item.length))return {status:'unknown',message:`De sparing in vloer ${slab.name||slab.id} heeft geen leesbare doorsnede.`};
-    if(samples.some(p=>!loops.some(rings=>pointInLoops(p,rings))))
-      return {status:'outside',message:`De trapdoorsnede steekt buiten de sparing in vloer ${slab.name||slab.id}. Controleer de plaatsing en de vloerhoogte.`,slabId:slab.id};
+      .map(r=>host.openings.find(o=>o.id===r.openingId)??{});
+    let result;
+    try {
+      result=fitAtLevel(bodies,slab,openings,bim,transform);
+    } catch {
+      // A section for which polygon operations fail cannot establish clearance.
+      result='unknown';
+    }
+    if(result==='outside')return {status:result,slabId:slab.id,
+      message:`De trapdoorsnede snijdt vloermateriaal buiten de gekoppelde sparingen in vloer ${slab.name||slab.id}.`};
+    if(result==='unknown')unresolved=slab;
+    if(result==='precheck')checked++;
   }
+  if(unresolved)return {status:'unknown',slabId:unresolved.id,
+    message:`De beschikbare vloer- en sparingsdoorsneden bij ${unresolved.name||unresolved.id} zijn onvoldoende om de passing vast te stellen.`};
   return checked?{status:'precheck',message:`De trapdoorsnede past op ${checked} vloerpeil(en) binnen de ingelezen sparingscontour. Vrije hoogte en bevestiging moeten nog worden getoetst.`}:
-    {status:'unknown',message:'De trap snijdt geen ingelezen vloerpeil; controleer de projectplaatsing.'};
+    {status:'unknown',message:'De trap snijdt geen ingelezen vloerdoorsnede of gekoppelde sparing; controleer de projectplaatsing.'};
 }

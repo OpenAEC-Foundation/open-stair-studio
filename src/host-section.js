@@ -1,4 +1,5 @@
 import {buildViewportMesh} from './viewport-mesh.js';
+import clipping from 'polygon-clipping';
 
 const TOL=0.1;
 const key=p=>`${Math.round(p[0]/TOL)},${Math.round(p[1]/TOL)}`;
@@ -25,13 +26,18 @@ export function sectionSegments(triangles,z) {
 }
 
 export function sectionLoops(triangles,z) {
-  const segments=sectionSegments(triangles,z);
+  return closedLoops(sectionSegments(triangles,z)) ?? [];
+}
+
+function closedLoops(segments) {
   const ends=new Map();
   segments.forEach((edge,index)=>edge.forEach((p,side)=>{
     const k=key(p);
     if(!ends.has(k))ends.set(k,[]);
     ends.get(k).push({index,side});
   }));
+  // An incomplete or branching section cannot establish material/void parity.
+  if([...ends.values()].some(entries=>entries.length!==2))return null;
   const used=new Set(),loops=[];
   for(let seed=0;seed<segments.length;seed++) {
     if(used.has(seed))continue;
@@ -46,9 +52,31 @@ export function sectionLoops(triangles,z) {
       if(!candidate)break;
       index=candidate.index;side=candidate.side;
     }
-    if(closed&&loop.length>=3)loops.push(loop);
+    if(!closed||loop.length<3)return null;
+    loops.push(loop);
   }
   return loops;
+}
+
+// Each closed body contributes its even/odd section, so inner rings remain holes.
+// Quantise both imported and generated geometry on the same 0.1 mm section grid.
+export function sectionArea(triangles,z,transform=p=>p) {
+  const rings=closedLoops(sectionSegments(triangles,z));
+  if(!rings)return null;
+  if(!rings.length)return [];
+  const polygons=rings.map(ring=>[ring.map(p=>transform(p).map(v=>Math.round(v/TOL)*TOL))]);
+  return clipping.xor(...polygons);
+}
+
+export function stairBodyTriangles(geometry) {
+  const groups=[];
+  for(const field of ['treads','landings','stringers','componentParts']){
+    for(const part of geometry[field]??[]){
+      const body={...geometry,treads:[],landings:[],stringers:[],componentParts:[],[field]:[part]};
+      groups.push(viewportTriangles(body));
+    }
+  }
+  return groups;
 }
 
 export function pointInLoops(point,loops) {
@@ -57,6 +85,7 @@ export function pointInLoops(point,loops) {
     for(let i=0,j=loop.length-1;i<loop.length;j=i++) {
       const a=loop[j],b=loop[i];
       const dx=b[0]-a[0],dy=b[1]-a[1];
+      if(dx===0&&dy===0)continue;
       const cross=(point[0]-a[0])*dy-(point[1]-a[1])*dx;
       const along=(point[0]-a[0])*dx+(point[1]-a[1])*dy;
       if(Math.abs(cross)<=TOL*Math.hypot(dx,dy)&&along>=-TOL&&along<=dx*dx+dy*dy+TOL) return true;

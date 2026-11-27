@@ -70,6 +70,12 @@ def check(page, download):
         args.output.mkdir(parents=True, exist_ok=True)
         for f in (step, layer):
             shutil.copyfile(f, args.output / f.name)
+    if args.kit:
+        for filename, counts in [('AC20-FZK-Haus.ifc', '4 vloeren · 1 gekoppelde vloersparing'),
+                                 ('AC20-Institute-Var-2.ifc', '26 vloeren · 4 gekoppelde vloersparingen')]:
+            panel.locator('#host-ifc-file').set_input_files(args.kit / filename)
+            panel.get_by_text(counts, exact=True).wait_for(timeout=60000)
+            print(f'{filename}: {counts}', flush=True)
 
     config = json.loads((EXAMPLES / 'zes-trapontwerpen.oss.json').read_text(encoding='utf-8'))
     items = [i for i in config['stairwell']['instances'] if i['type'] in ('portable', 'ladder')]
@@ -101,5 +107,6 @@ if __name__ == '__main__':
     target.add_argument('url', nargs='?')
     target.add_argument('--desktop')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--kit', type=Path, help='Directory containing the two published Archicad 20 KIT models')
     args = parser.parse_args()
     run_handoff(['--desktop', args.desktop] if args.desktop else [args.url], check)

@@ -22,9 +22,11 @@ Bij de houten bordestrappen kan de bordesoptrede worden gekozen. De boom van de 
 
 Versie 0.13.20 biedt IFC4 voor coördinatie en een experimentele IFCX-alpha-export. De IFCX-laag bevat dezelfde productidentiteiten en een driehoeksnet in wereldcoördinaten per fysiek onderdeel. Contractuele levering vraagt afspraken over het ontvangende pakket, schema en informatiebehoefte. De metingen op tien gepubliceerde bestanden staan in de [vergelijking met fabrikant- en gebouwmodellen](bim-referentietrappen.md).
 
+De download vanuit het hoofdtrapontwerp bevat de ontworpen trap. In de componentopstelling kiest de gebruiker het geselecteerde exemplaar of alle daar geplaatste exemplaren. Voor samenvoegen van het hoofdtrapontwerp en de componentopstelling in een coördinatiemodel gebruiken beide exports hetzelfde projectnulpunt.
+
 Bij een gesloten houten trap met ingefreesde stootborden bevat IFC4 de uitsparingen en de aansluitende lippen. Een open houten trap met alleen tredehuizen gebruikt nominale coördinatievolumes. Een rooster dat als tredesysteem in Engineering is gekozen heeft een coördinatievlak en opgegeven inbouwdikte. De complete stalen roostertrap uit Trapontwerp heeft fysieke onderdelen. Oude hoofdtrapexports met willekeurig toegekende GlobalIds kunnen een eenmalige hervergelijking vragen wanneer een project overstapt naar 0.13.20.
 
-De hostimport leest vloeren en sparingen voor een doorsnedecontrole, inclusief niet-rechthoekige contouren. Vrije hoogte, hellende vloeren en volledige gebouwpassing blijven open. Het hostbestand blijft tijdens de sessie in het geheugen.
+Vanaf 0.13.21 vergelijkt de hostcontrole bij het hoofdtrapontwerp de volledige horizontale doorsneden op het middenpeil van elke vloer. Alleen openingselementen die de vloer via IfcRelVoidsElement uitsparen tellen mee. Op dit peil onderzoekt Studio ook ingesloten stukken vloermateriaal en concave contouren. De vergelijking gebruikt een raster van 0,1 mm. Vrije hoogte, hellende vloeren en volledige driedimensionale gebouwpassing vragen een aparte toets. Het hostbestand blijft tijdens de sessie in het geheugen.
 
 [digiGO, NAA.K.T. materiaalbenaming](https://www.digigo.nu/wp-content/uploads/2023/11/EenduidigeMateriaalbenaming_toelichting.pdf)
 
