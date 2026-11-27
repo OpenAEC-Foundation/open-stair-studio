@@ -1,4 +1,6 @@
 import { tessellate } from './ifc-tessellate.js';
+import { compressedModelGuid, ifcModelId } from './ifc-identity.js';
+import { stairMeasureProperties } from './ifc-stair-properties.js';
 import * as IFC from 'web-ifc';
 import { inspectStair } from './stair.js';
 import { defaultEngineering, deriveEngineering } from './engineering.js';
@@ -19,6 +21,7 @@ const stairTypes = {
 
 export function createIfc4WithApi(api, model, geometry) {
   const stair = model.stair;
+  if (model.stairEnabled === false || !stair) throw new Error('Kies eerst een traptype.');
   // An unprofiled design check admits concept designs with outstanding Bbl findings.
   const issue = inspectStair({stair,engineering:model.engineering}).find(item => item.level === 'error');
   if (issue) throw new Error(issue.detail);
@@ -66,13 +69,17 @@ function writeModel(api, sid, model, geometry) {
   const detailParts = engineering.structureType === 'timber' ? geometry.detailParts ?? buildStairDetails(stair, geometry) : [];
   const dossier = deriveEngineering(model, geometry);
   const landingJointCheck = checkLandingJoints(model, geometry);
-  const separateTreads = engineering.structureType !== 'timber';
-  const joined = !separateTreads && Boolean(geometry.riserJoinery?.pockets.length);
+  const engineeredTreads = engineering.structureType !== 'timber';
+  const joined = !engineeredTreads && Boolean(geometry.riserJoinery?.pockets.length);
   const surfaceTreads = ['grating', 'custom'].includes(engineering.structureType);
-  const profiledTimber=!separateTreads&&['round','bevel'].includes(stair.noseProfile);
+  const profiledTimber=!engineeredTreads&&['round','bevel'].includes(stair.noseProfile);
   let profiledTreadBrepCount=0;
   const mm = value => Number(value) / 1000;
   const e = (type, ...args) => api.CreateIfcEntity(sid, type, ...args);
+  const namespace = ifcModelId(model);
+  const guid = (...keys) => api.CreateIfcType(sid, IFC.IFCGLOBALLYUNIQUEID, compressedModelGuid(namespace, ...keys));
+  const partKey = id => id.startsWith(stair.mark + '-') ? id.slice(stair.mark.length + 1) : id;
+  const partGuid = id => guid('part', partKey(id));
   const label = value => api.CreateIfcType(sid, IFC.IFCLABEL, String(value ?? ''));
   const text = value => api.CreateIfcType(sid, IFC.IFCTEXT, String(value ?? ''));
   const identifier = value => api.CreateIfcType(sid, IFC.IFCIDENTIFIER, String(value ?? ''));
@@ -90,21 +97,21 @@ function writeModel(api, sid, model, geometry) {
   ]);
   const world = axis3();
   const context = e(IFC.IFCGEOMETRICREPRESENTATIONCONTEXT, null, label('Model'), api.CreateIfcType(sid, IFC.IFCINTEGER, 3), real(1e-5), world, null);
-  const project = e(IFC.IFCPROJECT, api.CreateIFCGloballyUniqueId(sid), null, label(model.project.name), text(model.project.number), null, label(model.project.revision), null, [context], unitAssignment);
+  const project = e(IFC.IFCPROJECT, guid('project'), null, label(model.project.name), text(model.project.number), null, null, null, [context], unitAssignment);
 
   const bim = model.bim ?? { originX: 0, originY: 0, originZ: 0, originRotationDeg: 0, originAgreed: false };
   const rotation = Number(bim.originRotationDeg ?? 0) * Math.PI / 180;
   const sitePlacement = e(IFC.IFCLOCALPLACEMENT, null,
     axis3([mm(bim.originX), mm(bim.originY), mm(bim.originZ)], [0,0,1], [Math.cos(rotation),Math.sin(rotation),0]));
-  const site = e(IFC.IFCSITE, api.CreateIFCGloballyUniqueId(sid), null, label(model.project.location || 'Projectlocatie'), null, null, sitePlacement, null, null, enumValue('ELEMENT'), null, null, null, null, null);
+  const site = e(IFC.IFCSITE, guid('site'), null, label(model.project.location || 'Projectlocatie'), null, null, sitePlacement, null, null, enumValue('ELEMENT'), null, null, null, null, null);
   const buildingPlacement = localPlacement(sitePlacement);
-  const building = e(IFC.IFCBUILDING, api.CreateIFCGloballyUniqueId(sid), null, label(model.project.name), null, null, buildingPlacement, null, null, enumValue('ELEMENT'), null, null, null);
+  const building = e(IFC.IFCBUILDING, guid('building'), null, label(model.project.name), null, null, buildingPlacement, null, null, enumValue('ELEMENT'), null, null, null);
   const storeyPlacement = localPlacement(buildingPlacement);
-  const storey = e(IFC.IFCBUILDINGSTOREY, api.CreateIFCGloballyUniqueId(sid), null, label('Verdieping 01'), null, null, storeyPlacement, null, null, enumValue('ELEMENT'), length(0));
+  const storey = e(IFC.IFCBUILDINGSTOREY, guid('storey'), null, label('Verdieping 01'), null, null, storeyPlacement, null, null, enumValue('ELEMENT'), length(0));
   const stairPlacement = localPlacement(storeyPlacement);
   const stairType = stairTypes[stair.type] ?? 'NOTDEFINED';
   const windingFlight = d.family.winder === true;
-  const stairElement = e(IFC.IFCSTAIR, api.CreateIFCGloballyUniqueId(sid), null, label(`${stair.mark} · ${stair.name}`), text('Open Stair Studio · conceptmodel; niet voor productie of vergunningstoets'), label(stair.type), stairPlacement, null, identifier(stair.mark), enumValue(stairType));
+  const stairElement = e(IFC.IFCSTAIR, guid('stair'), null, label(`${stair.mark} · ${stair.name}`), text('Open Stair Studio · conceptmodel; niet voor productie of vergunningstoets'), label(stair.type), stairPlacement, null, identifier(stair.mark), enumValue(stairType));
   const millimetre = unit('LENGTHUNIT', 'MILLI', 'METRE');
   const singleProperty = ([name, type, value, propertyUnit]) => e(IFC.IFCPROPERTYSINGLEVALUE, identifier(name), null,
     api.CreateIfcType(sid, type, value), propertyUnit ?? (type === IFC.IFCLENGTHMEASURE ? millimetre : null));
@@ -134,7 +141,7 @@ function writeModel(api, sid, model, geometry) {
     ] : []),
     ...(engineering.use !== 'regular' && engineering.escapeBasis ? [['EscapeRouteBasis', IFC.IFCTEXT, engineering.escapeBasis]] : []),
     ...(engineering.notes ? [['EngineeringNotes', IFC.IFCTEXT, engineering.notes]] : []),
-    ...(separateTreads ? [
+    ...(engineeredTreads ? [
       ['TreadSystem', IFC.IFCLABEL, dossier.structureLabel],
       ['GeometryScope', IFC.IFCTEXT, 'Treden volgens nominale ontwerpcontour. Ruimte voor wangen en bordessen is gereserveerd.']
     ] : [['Material', IFC.IFCLABEL, stair.material], ...technicalProperties]),
@@ -151,12 +158,12 @@ function writeModel(api, sid, model, geometry) {
       ['NosingProfile', IFC.IFCLABEL, stair.noseProfile==='round'?'Upper quarter round':'Upper 45 degree bevel'],
       ['NosingSize_mm', IFC.IFCLENGTHMEASURE, stair.noseSize]
     ]:[]),
-    ...(separateTreads ? [] : [
+    ...(engineeredTreads ? [] : [
       ['StringerType', IFC.IFCLABEL, windingFlight ? 'Gesegmenteerde ingekroosde boom met verstek' : 'Zijbomen per zijde'],
       ['StringerLeft', IFC.IFCLABEL, stair.stringerLeft==='cut'?'Uitgezaagde keepboom':'Ingekroosde boom'],
       ['StringerRight', IFC.IFCLABEL, stair.stringerRight==='cut'?'Uitgezaagde keepboom':'Ingekroosde boom']]),
     ['Revision', IFC.IFCLABEL, model.project.revision],
-    ...(!separateTreads && model.joinery?.type === 'housed' ? [
+    ...(!engineeredTreads && model.joinery?.type === 'housed' ? [
       ['TreadJoint', IFC.IFCLABEL, 'Housed tread with shouldered tongues'],
       ['HousingDepth_mm', IFC.IFCLENGTHMEASURE, model.joinery.depth],
       ['HousingTotalClearance_mm', IFC.IFCLENGTHMEASURE, model.joinery.clearance],
@@ -172,10 +179,11 @@ function writeModel(api, sid, model, geometry) {
       ['ExitTreads', IFC.IFCINTEGER, d.exitSteps]
     ] : [])
   ].map(singleProperty);
-  const stairPset = e(IFC.IFCPROPERTYSET, api.CreateIFCGloballyUniqueId(sid), null, label('Pset_OpenStairStudio_Design'), text('Open Stair Studio design parameters; dimensions are nominal millimetres'), stairProperties);
-  const relationship = (type, from, to) => e(type, api.CreateIFCGloballyUniqueId(sid), null, null, null, from, to);
+  const stairPset = e(IFC.IFCPROPERTYSET, guid('pset', 'design'), null, label('Pset_OpenStairStudio_Design'), text('Open Stair Studio design parameters; dimensions are nominal millimetres'), stairProperties);
+  const relationship = (type, from, to, key) => e(type,
+    guid('relation', type, key ?? (Array.isArray(from) ? to.GlobalId.value : from.GlobalId.value)), null, null, null, from, to);
   const stairPsetRelation = relationship(IFC.IFCRELDEFINESBYPROPERTIES, [stairElement], stairPset);
-  const originPset = e(IFC.IFCPROPERTYSET, api.CreateIFCGloballyUniqueId(sid), null,
+  const originPset = e(IFC.IFCPROPERTYSET, guid('pset', 'origin'), null,
     label('OSS_ProjectOrigin'), text('IFC Site plaatsing ten opzichte van het afgesproken projectnulpunt'), [
       ['OriginX_mm', IFC.IFCLENGTHMEASURE, bim.originX],
       ['OriginY_mm', IFC.IFCLENGTHMEASURE, bim.originY],
@@ -186,7 +194,7 @@ function writeModel(api, sid, model, geometry) {
   const originRelation = relationship(IFC.IFCRELDEFINESBYPROPERTIES, [site], originPset);
   const classificationRelations = [];
   if (naakt.some(Boolean)) {
-    const pset = e(IFC.IFCPROPERTYSET, api.CreateIFCGloballyUniqueId(sid), null, label('OSS_NAAKT'),
+    const pset = e(IFC.IFCPROPERTYSET, guid('pset', 'naakt'), null, label('OSS_NAAKT'),
       text('Projectopgave materiaalbenaming. Alle drie velden zijn nodig voor een volledige NAA.K.T.-naam.'),
       [['Naam', IFC.IFCLABEL, naakt[0]], ['Kenmerk', IFC.IFCLABEL, naakt[1]],
         ['Toepassing', IFC.IFCLABEL, naakt[2]], ['Volledig', IFC.IFCBOOLEAN, naakt.every(Boolean)]]
@@ -286,7 +294,7 @@ function writeModel(api, sid, model, geometry) {
     return representation([solid], 'CSG');
   }
   const stairChildren = [];
-  const timberObjects = separateTreads ? [] : [stairElement];
+  const timberObjects = engineeredTreads ? [] : [stairElement];
   const flightObjects = [];
   const landingObjects = [];
   const frameObjects = [];
@@ -295,12 +303,29 @@ function writeModel(api, sid, model, geometry) {
   const railingObjects = [];
   const typedDetails = new Map();
   const treadObjects = [];
-  const joinedStrings = [];
-  const joinedSteps = [];
+  const timberStringers = [];
+  const timberTreads = [];
   const joineryHosts = new Map();
   const partRelations = [];
+  const flightDetails = new Map();
+  const flightGroups = [];
+  const netByHost = new Map(joined ? geometry.parts.map(part => [part.id, part.volume]) : []);
+  function addNetVolume(object, setName, volume) {
+    if (!Number.isFinite(volume) || volume <= 0) throw new Error('Ongeldig nettovolume voor ' + object.Tag.value);
+    const quantity = e(IFC.IFCQUANTITYVOLUME, label('NetVolume'), null, null,
+      api.CreateIfcType(sid, IFC.IFCVOLUMEMEASURE, volume), null);
+    const set = e(IFC.IFCELEMENTQUANTITY, guid('quantity', object.GlobalId.value), null, label(setName), null,
+      label('BaseQuantities'), [quantity]);
+    partRelations.push(relationship(IFC.IFCRELDEFINESBYPROPERTIES, [object], set));
+  }
+  function addStairMeasures(object, name, risers, treads) {
+    const fields = stairMeasureProperties({risers, treads, rise:mm(d.rise), going:windingFlight ? null : mm(stair.going)});
+    const pset = e(IFC.IFCPROPERTYSET, guid('pset', name, object.GlobalId.value), null, label(name), null, fields.map(singleProperty));
+    partRelations.push(relationship(IFC.IFCRELDEFINESBYPROPERTIES, [object], pset));
+  }
+  addStairMeasures(stairElement, 'Pset_StairCommon', d.risers, d.treadCount);
   function reservation(id, role, solid, parentPlacement) {
-    const object = e(IFC.IFCBUILDINGELEMENTPROXY, api.CreateIFCGloballyUniqueId(sid), null,
+    const object = e(IFC.IFCBUILDINGELEMENTPROXY, partGuid(id), null,
       label(id), text('Ruimtelijke reservering voor ' + role + '. Constructiedetail en materiaal volgen uit de projectuitwerking.'),
       label('Ruimtereservering ' + role), localPlacement(parentPlacement), representation([solid]),
       identifier(id), enumValue('PROVISIONFORSPACE'));
@@ -318,59 +343,64 @@ function writeModel(api, sid, model, geometry) {
     } else {
       shape = representation([treadSolid(tread)]);
     }
-    return e(IFC.IFCPLATE, api.CreateIFCGloballyUniqueId(sid), null, label(tread.id),
+    return e(IFC.IFCPLATE, partGuid(tread.id), null, label(tread.id),
       text(surfaceTreads ? 'Nominaal bovenvlak van de trede.' : 'Nominale buitencontour en inbouwdikte van de trede.'),
       label(dossier.structureLabel), localPlacement(flightPlacement), shape, identifier(tread.id), enumValue('USERDEFINED'));
   }
   for (const flight of geometry.flights) {
     const treads = geometry.treads.filter(tread => tread.flightIndex === flight.index);
     const flightPlacement = localPlacement(stairPlacement);
-    const plates = separateTreads ? treads.map(tread => engineeringTread(tread, flightPlacement)) : [];
+    const plates = engineeredTreads ? treads.map(tread => engineeringTread(tread, flightPlacement)) : [];
     const parts = [...plates];
-    const solids = separateTreads || joined ? [] : treads.map(treadSolid);
-    if (joined) {
+    if (!engineeredTreads) {
       for (const tread of treads) {
-        const object = e(IFC.IFCPLATE, api.CreateIFCGloballyUniqueId(sid), null, label(tread.id), null,
-          label('Houten trede'), localPlacement(flightPlacement), finishedBody(tread.id, treadSolid(tread)),
+        const body = profiledTimber && !tread.noseDetail ? profileTimberTread(tread,stair) : tread;
+        const object = e(IFC.IFCPLATE, partGuid(tread.id), null, label(tread.id), null,
+          label('Houten trede'), localPlacement(flightPlacement), finishedBody(tread.id, treadSolid(body)),
           identifier(tread.id), enumValue('USERDEFINED'));
+        addNetVolume(object,'Qto_PlateBaseQuantities',netByHost.get(tread.id) ?? body.volume);
         parts.push(object);
-        joinedSteps.push(object);
+        timberTreads.push(object);
         joineryHosts.set(tread.id, object);
       }
     }
     for (const beam of geometry.stringers.filter(item => item.flightIndex === flight.index)) {
       const solid = beam.faces ? mitredBeamSolid(beam) : slopedBeamSolid(beam);
-      if (separateTreads) parts.push(reservation(beam.id, 'wang', solid, flightPlacement));
-      else if (joined) {
-        const object = e(IFC.IFCMEMBER, api.CreateIFCGloballyUniqueId(sid), null, label(beam.id), null,
+      if (engineeredTreads) parts.push(reservation(beam.id, 'wang', solid, flightPlacement));
+      else {
+        const object = e(IFC.IFCMEMBER, partGuid(beam.id), null, label(beam.id), null,
           label('Houten trapboom'), localPlacement(flightPlacement), finishedBody(beam.id, solid),
           identifier(beam.id), enumValue('STRINGER'));
-        joinedStrings.push(object);
+        timberStringers.push(object);
+        addNetVolume(object,'Qto_MemberBaseQuantities',netByHost.get(beam.id) ?? beam.volume);
         parts.push(object);
         joineryHosts.set(beam.id, object);
       }
-      else solids.push(solid);
     }
-    const flightRep = representation(solids);
-    const flightObject = e(IFC.IFCSTAIRFLIGHT, api.CreateIFCGloballyUniqueId(sid), null,
-      label(flight.label), text(`Trapvlucht ${flight.index + 1} · ${separateTreads ? dossier.structureLabel : stair.material}`),
-      label(separateTreads ? 'Trapvlucht met afzonderlijke treden' : 'Timber stair flight'),
-      flightPlacement, flightRep, identifier(`${stair.mark}-V${flight.index + 1}`),
+    const flightObject = e(IFC.IFCSTAIRFLIGHT, guid('flight', flight.index), null,
+      label(flight.label), text(`Trapvlucht ${flight.index + 1} · ${engineeredTreads ? dossier.structureLabel : stair.material}`),
+      label(engineeredTreads ? 'Trapvlucht met afzonderlijke treden' : 'Timber stair flight'),
+      flightPlacement, null, identifier(`${stair.mark}-V${flight.index + 1}`),
       api.CreateIfcType(sid, IFC.IFCINTEGER, flight.risers), api.CreateIfcType(sid, IFC.IFCINTEGER, flight.treadCount),
       api.CreateIfcType(sid, IFC.IFCPOSITIVELENGTHMEASURE, mm(d.rise)),
       windingFlight ? null : api.CreateIfcType(sid, IFC.IFCPOSITIVELENGTHMEASURE, mm(stair.going)),
       enumValue(windingFlight ? 'WINDER' : 'STRAIGHT'));
     stairChildren.push(flightObject);
     flightObjects.push(flightObject);
-    if (!separateTreads) timberObjects.push(flightObject);
-    if (parts.length) {
-      partRelations.push(relationship(IFC.IFCRELAGGREGATES, flightObject, parts));
-      treadObjects.push(...plates);
+    addStairMeasures(flightObject, 'Pset_StairFlightCommon', flight.risers, treads.length);
+    if (!engineeredTreads) timberObjects.push(flightObject);
+    const group = { flightObject, flightPlacement, parts };
+    flightGroups.push(group);
+    for (const tread of treads) {
+      flightDetails.set(tread.id + '-SB', group);
+      flightDetails.set(tread.id + '-WL', group);
     }
+    flightDetails.set(`${stair.mark}-V${flight.index + 1}-UIT-SB`, group);
+    treadObjects.push(...plates);
   }
   if (treadObjects.length) {
     const scope = surfaceTreads ? 'Loopvlak met nominale inbouwdikte als eigenschap.' : 'Nominale uitwendige plaatafmetingen.';
-    const pset = e(IFC.IFCPROPERTYSET, api.CreateIFCGloballyUniqueId(sid), null, label('OSS_TreadSystem'),
+    const pset = e(IFC.IFCPROPERTYSET, guid('pset', 'tread-system'), null, label('OSS_TreadSystem'),
       text('Opgegeven projectgegevens van de treden voor ontwerpcoördinatie.'), [
         ...technicalProperties, ['GeometryScope', IFC.IFCTEXT, scope],
         ['NominalTreadThickness_mm', IFC.IFCLENGTHMEASURE, geometry.treads[0].thickness]
@@ -380,7 +410,7 @@ function writeModel(api, sid, model, geometry) {
     if (materialSpec) {
       const [name, category] = materialSpec;
       const material = e(IFC.IFCMATERIAL, label(name), null, label(category));
-      partRelations.push(relationship(IFC.IFCRELASSOCIATESMATERIAL, treadObjects, material));
+      partRelations.push(relationship(IFC.IFCRELASSOCIATESMATERIAL, treadObjects, material, 'tread-system'));
     }
   }
   for (const landing of geometry.landings) {
@@ -388,28 +418,32 @@ function writeModel(api, sid, model, geometry) {
     const minY = Math.min(...landing.points.map(p => p.y)), maxY = Math.max(...landing.points.map(p => p.y));
     const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
     const solid = boxSolid(center, { x: 1, y: 0 }, maxX - minX, maxY - minY, landing.thickness, landing.elevation - landing.thickness);
-    const slab = separateTreads ? reservation(landing.id, 'bordes', solid, stairPlacement) :
-      e(IFC.IFCSLAB, api.CreateIFCGloballyUniqueId(sid), null, label(landing.id), text('Trapbordes · conceptplaat'), label('Landing'),
+    const slab = engineeredTreads ? reservation(landing.id, 'bordes', solid, stairPlacement) :
+      e(IFC.IFCSLAB, partGuid(landing.id), null, label(landing.id), text('Trapbordes · conceptplaat'), label('Landing'),
       localPlacement(stairPlacement), finishedBody(landing.id, solid), identifier(landing.id), enumValue('LANDING'));
     stairChildren.push(slab);
     landingObjects.push(slab);
     if (joined) joineryHosts.set(landing.id, slab);
-    if (!separateTreads) timberObjects.push(slab);
+    if (!engineeredTreads) {
+      timberObjects.push(slab);
+      addNetVolume(slab,'Qto_SlabBaseQuantities',netByHost.get(landing.id) ?? landing.volume);
+    }
   }
-  if (!separateTreads) {
+  if (!engineeredTreads) {
     for (const member of geometry.landingFrame ?? []) {
       const solid = boxSolid(member.center, member.direction, member.length, member.width,
         member.thickness, member.elevation-member.thickness);
-      const object = e(IFC.IFCBEAM, api.CreateIFCGloballyUniqueId(sid), null,
+      const object = e(IFC.IFCBEAM, partGuid(member.id), null,
         label(member.id), text('Houten bordesrandligger; gebouwankers projectmatig uit te werken'),
         label('Bordesrandligger'), localPlacement(stairPlacement), representation([solid]),
         identifier(member.id), enumValue('BEAM'));
       stairChildren.push(object);
       frameObjects.push(object);
+      addNetVolume(object,'Qto_BeamBaseQuantities',member.volume);
       timberObjects.push(object);
     }
     if (frameObjects.length) {
-      const pset = e(IFC.IFCPROPERTYSET, api.CreateIFCGloballyUniqueId(sid), null,
+      const pset = e(IFC.IFCPROPERTYSET, guid('pset', 'landing-frame'), null,
         label('OSS_Bordesraam'), text('Randliggers en stuiknaden; bevestiging constructief uit te werken'), [
           ['Randliggerbreedte_mm', IFC.IFCLENGTHMEASURE, stair.landingFrameWidth],
           ['Randliggerhoogte_mm', IFC.IFCLENGTHMEASURE, stair.landingFrameDepth],
@@ -452,16 +486,19 @@ function writeModel(api, sid, model, geometry) {
   }
   for (const detail of detailParts) {
     const [entityType, predefined] = {railing:[IFC.IFCRAILING,'HANDRAIL'], member:[IFC.IFCMEMBER,'POST'], plate:[IFC.IFCPLATE,'USERDEFINED']}[detail.kind];
-    const obj = e(entityType, api.CreateIFCGloballyUniqueId(sid), null, label(detail.label),
+    const flight = flightDetails.get(detail.id);
+    const obj = e(entityType, partGuid(detail.id), null, label(detail.label),
       text('Ontwerpcoördinatie van leuning of stootbord.'), label(detail.label),
-      localPlacement(stairPlacement), detailSolid(detail), identifier(detail.id), enumValue(detail.role==='nosingStrip'?'MEMBER':predefined));
-    stairChildren.push(obj);
+      localPlacement(flight?.flightPlacement ?? stairPlacement), detailSolid(detail), identifier(detail.id), enumValue(detail.role==='nosingStrip'?'MEMBER':predefined));
+    (flight?.parts ?? stairChildren).push(obj);
+    if (detail.role === 'riser') addNetVolume(obj,'Qto_PlateBaseQuantities',detail.volumeM3);
+    if (detail.role === 'nosingStrip') addNetVolume(obj,'Qto_MemberBaseQuantities',detail.volumeM3);
     // Keep the receiving part and the mating riser selectable in BIM even
     // when an oblique end lands on a different stringer facet at a new nose position.
     for (const pocket of detail.riserPockets ?? []) {
       const host = joineryHosts.get(pocket.hostId);
       if (!host) throw new Error('Ontbrekend IFC-onderdeel voor stootbordgroef '+pocket.id+'.');
-      partRelations.push(e(IFC.IFCRELCONNECTSELEMENTS, api.CreateIFCGloballyUniqueId(sid), null,
+      partRelations.push(e(IFC.IFCRELCONNECTSELEMENTS, guid('pocket', partKey(pocket.hostId), partKey(detail.id), pocket.face), null,
         label(pocket.id), null, null, host, obj));
     }
     const typeKey = `${detail.kind}:${detail.role}`;
@@ -476,7 +513,7 @@ function writeModel(api, sid, model, geometry) {
         ['Netto hout',IFC.IFCVOLUMEMEASURE,detail.volumeM3],['Bruto hout',IFC.IFCVOLUMEMEASURE,detail.stockVolumeM3],
         ['Traponderdeel',IFC.IFCLABEL,detail.partOf],['Fabricagebevinding',IFC.IFCTEXT,detail.fabricationIssue]
       ].filter(([, ,value])=>value!=null).map(singleProperty);
-      const pset=e(IFC.IFCPROPERTYSET,api.CreateIFCGloballyUniqueId(sid),null,label('OSS_Houtdetail'),null,properties);
+      const pset=e(IFC.IFCPROPERTYSET,guid('pset', 'timber-detail', partKey(detail.id)),null,label('OSS_Houtdetail'),null,properties);
       partRelations.push(relationship(IFC.IFCRELDEFINESBYPROPERTIES,[obj],pset));
     }
     if (!detailMaterials.has(detail.material)) detailMaterials.set(detail.material, []);
@@ -487,11 +524,14 @@ function writeModel(api, sid, model, geometry) {
     if (wood) timberObjects.push(...objects);
     else {
       const material = e(IFC.IFCMATERIAL, label('Verzinkt staal'), null, label('steel'));
-      partRelations.push(relationship(IFC.IFCRELASSOCIATESMATERIAL, objects, material));
+      partRelations.push(relationship(IFC.IFCRELASSOCIATESMATERIAL, objects, material, 'detail-' + id));
     }
   }
-  if(!separateTreads)for(const screw of geometry.landingFasteners??[]) {
-    const object=e(IFC.IFCMECHANICALFASTENER,api.CreateIFCGloballyUniqueId(sid),null,
+  for (const {flightObject, parts} of flightGroups) {
+    partRelations.push(relationship(IFC.IFCRELAGGREGATES, flightObject, parts));
+  }
+  if(!engineeredTreads)for(const screw of geometry.landingFasteners??[]) {
+    const object=e(IFC.IFCMECHANICALFASTENER,partGuid(screw.id),null,
       label(screw.id),text(`Bordesraamschroef bij ${screw.jointId}; constructieve weerstand te toetsen`),
       label('Schroef'),localPlacement(stairPlacement),detailSolid(screw),identifier(screw.id),
       api.CreateIfcType(sid,IFC.IFCPOSITIVELENGTHMEASURE,mm(screw.diameter)),
@@ -501,18 +541,18 @@ function writeModel(api, sid, model, geometry) {
   }
   if(screwObjects.length){
     const material=e(IFC.IFCMATERIAL,label('Verzinkt staal'),null,label('steel'));
-    partRelations.push(relationship(IFC.IFCRELASSOCIATESMATERIAL,screwObjects,material));
+    partRelations.push(relationship(IFC.IFCRELASSOCIATESMATERIAL,screwObjects,material,'landing-screws'));
   }
   if (timberObjects.length) {
-    timberObjects.push(...joinedStrings, ...joinedSteps);
+    timberObjects.push(...timberStringers, ...timberTreads);
     const material = e(IFC.IFCMATERIAL, label(specifiedTimber), null, label('wood'));
-    partRelations.push(relationship(IFC.IFCRELASSOCIATESMATERIAL, timberObjects, material));
+    partRelations.push(relationship(IFC.IFCRELASSOCIATESMATERIAL, timberObjects, material, 'timber'));
   }
 
   const typeRelations = [];
   function assignType(objects, entity, name, predefined) {
     if (!objects.length) return;
-    const type = e(entity, api.CreateIFCGloballyUniqueId(sid), null, label(name),
+    const type = e(entity, guid('type', entity, name), null, label(name),
       text('Open Stair Studio producttype voor ontwerpcoordinatie'), null, null, null, null,
       label(name), enumValue(predefined));
     typeRelations.push(relationship(IFC.IFCRELDEFINESBYTYPE, objects, type));
@@ -522,15 +562,15 @@ function writeModel(api, sid, model, geometry) {
   assignType(landingObjects.filter(o => o.type === IFC.IFCSLAB), IFC.IFCSLABTYPE, 'Trapbordes', 'LANDING');
   assignType(frameObjects, IFC.IFCBEAMTYPE, 'Houten bordesrandligger', 'BEAM');
   if(screwObjects.length){
-    const type=e(IFC.IFCMECHANICALFASTENERTYPE,api.CreateIFCGloballyUniqueId(sid),null,
+    const type=e(IFC.IFCMECHANICALFASTENERTYPE,guid('type', 'landing-screw'),null,
       label('Bordesraamschroef'),null,null,null,null,null,label('Schroef'),enumValue('SCREW'),
       api.CreateIfcType(sid,IFC.IFCPOSITIVELENGTHMEASURE,mm(stair.landingScrewDiameter)),
       api.CreateIfcType(sid,IFC.IFCPOSITIVELENGTHMEASURE,mm(stair.landingScrewLength)));
     typeRelations.push(relationship(IFC.IFCRELDEFINESBYTYPE,screwObjects,type));
   }
   assignType(treadObjects, IFC.IFCPLATETYPE, `${dossier.structureLabel} · trede`, 'USERDEFINED');
-  assignType(joinedSteps, IFC.IFCPLATETYPE, 'Houten trede', 'USERDEFINED');
-  assignType(joinedStrings, IFC.IFCMEMBERTYPE, 'Houten trapboom', 'STRINGER');
+  assignType(timberTreads, IFC.IFCPLATETYPE, 'Houten trede', 'USERDEFINED');
+  assignType(timberStringers, IFC.IFCMEMBERTYPE, 'Houten trapboom', 'STRINGER');
   assignType(reservedObjects, IFC.IFCBUILDINGELEMENTPROXYTYPE, 'Ruimtereservering trapconstructie', 'PROVISIONFORSPACE');
   for (const [key, objects] of typedDetails) {
     const [kind, role] = key.split(':');
@@ -539,19 +579,20 @@ function writeModel(api, sid, model, geometry) {
     assignType(objects, entity, `Traponderdeel · ${role}`, predefined);
   }
 
-  if (stair.nlsfbCode) {
+  if (stair.nlsfbCode || stair.nlsfbLandingCode || stair.nlsfbRailingCode) {
     const system = e(IFC.IFCCLASSIFICATION, null, null, null, label('NL-SfB'), null, null, null);
     const groups = new Map();
     const codeFor = object => (landingObjects.includes(object) || frameObjects.includes(object) || screwObjects.includes(object)) ? stair.nlsfbLandingCode || stair.nlsfbCode :
       railingObjects.includes(object) ? stair.nlsfbRailingCode || stair.nlsfbCode : stair.nlsfbCode;
-    for (const object of [stairElement, ...stairChildren, ...treadObjects, ...joinedSteps, ...joinedStrings]) {
+    for (const object of [stairElement, ...stairChildren, ...flightGroups.flatMap(group => group.parts)]) {
       const code = codeFor(object);
+      if (!code) continue;
       if (!groups.has(code)) groups.set(code, []);
-      if (!groups.get(code).includes(object)) groups.get(code).push(object);
+      groups.get(code).push(object);
     }
     for (const [code, objects] of groups) {
       const reference = e(IFC.IFCCLASSIFICATIONREFERENCE, null, identifier(code), label('NL-SfB-elementcode'), system, null, null);
-      classificationRelations.push(relationship(IFC.IFCRELASSOCIATESCLASSIFICATION, objects, reference));
+      classificationRelations.push(relationship(IFC.IFCRELASSOCIATESCLASSIFICATION, objects, reference, code));
     }
   }
 
@@ -574,7 +615,7 @@ function writeModel(api, sid, model, geometry) {
     const stairCount = count(IFC.IFCSTAIR);
     const flightCount = count(IFC.IFCSTAIRFLIGHT);
     const proxyIds = api.GetLineIDsWithType(validationId, IFC.IFCBUILDINGELEMENTPROXY);
-    const landingCount = separateTreads ? Array.from({length:proxyIds.size()}, (_, i) =>
+    const landingCount = engineeredTreads ? Array.from({length:proxyIds.size()}, (_, i) =>
       api.GetLine(validationId, proxyIds.get(i))).filter(proxy => proxy.ObjectType?.value === 'Ruimtereservering bordes').length : count(IFC.IFCSLAB);
     const brepCount = count(IFC.IFCFACETEDBREP);
     // Each pocket uses one extrusion as the second operand of a difference.
@@ -585,10 +626,10 @@ function writeModel(api, sid, model, geometry) {
     const expectedSolids = (surfaceTreads ? 0 : geometry.treads.length) + geometry.landings.length + geometry.stringers.length + detailParts.length + frameObjects.length + screwObjects.length;
     if (schema !== IFC.Schemas.IFC4 || stairCount !== 1 || flightCount !== geometry.flights.length ||
         count(IFC.IFCBOOLEANRESULT) !== cutterCount ||
-        count(IFC.IFCPLATE) !== (separateTreads ? geometry.treads.length : joinedSteps.length) + detailParts.filter(p=>p.kind==='plate').length ||
+        count(IFC.IFCPLATE) !== (engineeredTreads ? geometry.treads.length : timberTreads.length) + detailParts.filter(p=>p.kind==='plate').length ||
         count(IFC.IFCRAILING) !== detailParts.filter(p=>p.kind==='railing').length ||
-        count(IFC.IFCMEMBER) !== joinedStrings.length + detailParts.filter(p=>p.kind==='member').length ||
-        count(IFC.IFCBUILDINGELEMENTPROXY) !== (separateTreads ? geometry.stringers.length + geometry.landings.length : 0) ||
+        count(IFC.IFCMEMBER) !== timberStringers.length + detailParts.filter(p=>p.kind==='member').length ||
+        count(IFC.IFCBUILDINGELEMENTPROXY) !== (engineeredTreads ? geometry.stringers.length + geometry.landings.length : 0) ||
         surfaceCount !== (surfaceTreads ? geometry.treads.length : 0) ||
         landingCount !== geometry.landings.length || count(IFC.IFCBEAM) !== frameObjects.length ||
         count(IFC.IFCMECHANICALFASTENER) !== screwObjects.length ||

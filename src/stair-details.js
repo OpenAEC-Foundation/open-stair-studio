@@ -111,7 +111,7 @@ function railParts(stair,geometry,side) {
       stations.push(p);
       const bottom=bottomAt(p),top={...p,z:p.z+h};
       const radius=Math.min(13,stair.stringerThickness*.45);
-      parts.push({id:`${id}-ST-${stations.length}`,label:'Leuningstijl '+label,kind:'member',material:'galvanized',diameterMm:2*radius,lengthMm:distance(bottom,top),faces:postFaces(bottom,top,radius,10)});
+      parts.push({id:`${id}-ST-${stations.length}`,label:'Leuningstijl '+label,kind:'member',role:'post',material:'galvanized',diameterMm:2*radius,lengthMm:distance(bottom,top),faces:postFaces(bottom,top,radius,10)});
     }
     const n=Math.ceil(horizontal/115);
     for(let i=1;i<n;i++) {
@@ -119,7 +119,7 @@ function railParts(stair,geometry,side) {
       if (postT.some(t=>Math.abs(t-i/n)*horizontal<34)) continue;
       const bottom=bottomAt(p);
       const top={...p,z:p.z+h};
-      parts.push({id:`${id}-SP-${parts.length+1}`,label:'Balusterspijl '+label,kind:'member',material:'galvanized',
+      parts.push({id:`${id}-SP-${parts.length+1}`,label:'Balusterspijl '+label,kind:'member',role:'baluster',material:'galvanized',
         diameterMm:12,lengthMm:distance(bottom,top),faces:postFaces(bottom,top,6,8)});
     }
     tops.push({...a,z:a.z+h},{...b,z:b.z+h});
@@ -145,7 +145,7 @@ function railParts(stair,geometry,side) {
   }
   if(detailed) return buildTimberBalustrade(stair,segments,side);
   const path=cleanPath(tops);
-  if(path.length>1) parts.unshift({id,label:'Doorlopende handgreep '+label,kind:'railing',material:'timber',diameterMm:44,
+  if(path.length>1) parts.unshift({id,label:'Doorlopende handgreep '+label,kind:'railing',role:'handrail',material:'timber',diameterMm:44,
     axisPath:path,lengthMm:path.slice(1).reduce((s,p,i)=>s+distance(p,path[i]),0),faces:sweptHandrail(path,22)});
   return parts;
 }

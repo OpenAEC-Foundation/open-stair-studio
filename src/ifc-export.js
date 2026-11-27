@@ -3,7 +3,7 @@ import webIfcWasmUrl from 'web-ifc/web-ifc.wasm?url';
 import { createIfc4WithApi } from './ifc-export-core.js';
 
 let apiPromise;
-export async function createIfc4(model, geometry) {
+function exportApi() {
   if (!apiPromise) {
     const api = new IFC.IfcAPI();
     apiPromise = api.Init(() => webIfcWasmUrl).then(() => api).catch(error => {
@@ -11,5 +11,12 @@ export async function createIfc4(model, geometry) {
       throw error;
     });
   }
-  return createIfc4WithApi(await apiPromise, model, geometry);
+  return apiPromise;
+}
+export async function createIfc4(model, geometry) {
+  return createIfc4WithApi(await exportApi(), model, geometry);
+}
+export async function createIfcx(bytes) {
+  const {createIfcxWithApi} = await import('./ifcx-export.js');
+  return createIfcxWithApi(await exportApi(), bytes);
 }

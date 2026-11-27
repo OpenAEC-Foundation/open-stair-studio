@@ -37,7 +37,7 @@ function verifyMitres(stair, stringers) {
       for (const [i,j] of [[1,0],[2,3],[5,4],[6,7]]) assert.deepEqual(previous.vertices[i],vertices[j]);
     }
     for (let i=0; i<4; i++) {
-      close(vertices[i].z-vertices[i+4].z,stair.stringerDepth,'vertical depth');
+      close(vertices[i+4].z,Math.max(0,vertices[i].z-stair.stringerDepth),'floor-cut soffit');
       close(distance(vertices[i],vertices[i+4]),0,'vertical edges');
       const [a,b,c] = [0,1,2].map(offset=>beam.points[(i+offset)%4]);
       assert(cross(a,b,c)>0,'convex mitred footprint with positive rail lengths');

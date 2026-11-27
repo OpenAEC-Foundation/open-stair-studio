@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 import ifcopenshell
 import ifcopenshell.geom
 from ifcopenshell.util.shape import get_faces, get_vertices
+from ifcopenshell.util.element import get_psets
 import manifold3d as mf
 import numpy as np
 
@@ -55,6 +56,8 @@ with TemporaryDirectory() as folder:
             # Round nosings use a 24-chord quarter circle in IFC and an
             # analytical section in the cutting list. Straight faces are exact.
             tolerance = 1e-7 if host.ObjectType == "Houten trede" else 1e-8
+            quantities = [s['NetVolume'] for s in get_psets(host, qtos_only=True).values() if 'NetVolume' in s]
+            assert len(quantities) == 1 and abs(quantities[0]-actual) < tolerance, (file.name, host.Tag, quantities, actual)
             assert scheduled > 0 and abs(actual-scheduled) < tolerance, (
                 file.name, host.Tag, actual, scheduled
             )

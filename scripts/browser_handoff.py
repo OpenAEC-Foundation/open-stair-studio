@@ -10,13 +10,17 @@ from tempfile import TemporaryDirectory
 from playwright.sync_api import sync_playwright
 
 
+def download_button(page, target):
+    return page.get_by_role('button', name=target, exact=True) if isinstance(target, str) else target
+
+
 def edge(p, url, folder, check):
     with p.chromium.launch(channel='msedge') as browser:
         page = browser.new_page(viewport={'width': 1440, 'height': 920})
         page.goto(url)
         def download(label, ext):
             with page.expect_download() as event:
-                page.get_by_role('button', name=label, exact=True).click()
+                download_button(page, label).click()
             name = event.value.suggested_filename
             assert name.endswith(ext)
             event.value.save_as(folder / name)
@@ -48,7 +52,7 @@ def desktop(p, exe, folder, check):
         session.send('Browser.setDownloadBehavior', dict(behavior='allow', downloadPath=str(folder)))
         def download(label, ext):
             before = set(folder.glob('*' + ext))
-            page.get_by_role('button', name=label, exact=True).click()
+            download_button(page, label).click()
             for _ in range(150):
                 files = set(folder.glob('*' + ext)) - before
                 if files:

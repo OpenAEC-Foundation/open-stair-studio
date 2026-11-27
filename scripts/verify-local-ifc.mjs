@@ -34,6 +34,7 @@ const getTags=(id)=>new Map(rows(id,I.IFCREINFORCINGBAR).map(p=>[p.Tag.value.spl
 const sets=new Map();
 for(const relation of rows(mid,I.IFCRELDEFINESBYPROPERTIES)) {
   const set=ref(relation.RelatingPropertyDefinition);
+  if (set.type === I.IFCELEMENTQUANTITY) continue;
   const props=new Map(set.HasProperties.map(ref).map(v=>[v.Name.value,v.NominalValue.value]));
   assert.equal(props.size,set.HasProperties.length);
   for(const e of relation.RelatedObjects){

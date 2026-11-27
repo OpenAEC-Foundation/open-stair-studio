@@ -33,7 +33,8 @@ assert.deepEqual(JSON.parse(saved),well);
 const assemblies=assembleWell(well);
 assert.equal(assemblies.length,6);
 const project={number:'CAT-TEST',name:'Ontwerpcatalogus',revision:'A'};
-const data=await createStairwellIfc(project,well);
+const bim={originX:12500,originY:-6200,originZ:875,originRotationDeg:90,originAgreed:true};
+const data=await createStairwellIfc(project,well,bim);
 const api=new IFC.IfcAPI();await api.Init();
 const m=api.OpenModel(data),ref=h=>api.GetLine(m,h.value);
 const all=t=>{const ids=api.GetLineIDsWithType(m,t);return Array.from({length:ids.size()},(_,i)=>api.GetLine(m,ids.get(i)));};
@@ -57,6 +58,10 @@ function worldBounds(p,xyz){
   return [0,1,2].flatMap(k=>[Math.min(...coords.map(v=>v[k])),Math.max(...coords.map(v=>v[k]))]);
 }
 const truth={}, seen=new Set();
+const datum=props(all(IFC.IFCSITE)[0],'OSS_ProjectOrigin');
+assert.equal(datum.OriginZ_mm,bim.originZ);
+assert.equal(datum.RotationDegrees,90);
+assert.ok(datum.OriginAgreed===true || datum.OriginAgreed==='T');
 for(const g of assemblies){
   const i=g.instance,p=i.params,host=stairs.find(s=>s.Tag.value===i.mark),local=typeOf(i.type).build({...p,height:heightOn(well,i.storey)});
   assert.ok(host&&!g.issues.some(v=>v.level==='error'),i.type);
@@ -86,7 +91,10 @@ for(const g of assemblies){
     assert.equal(materials.length,1,tag);assert.equal(ref(materials[0].RelatingMaterial).Category.value,q.material,tag);
     const rep=ref(ref(product.Representation).Representations[0]),mesh=ref(rep.Items[0]);
     assert.equal(mesh.type,IFC.IFCTRIANGULATEDFACESET);assert.equal(mesh.Closed.value,true);
-    const b=boundsOf([q]),target=[b.xmin,b.xmax,b.ymin,b.ymax,b.zmin,b.zmax];
+    const b=boundsOf([q]);
+    // At +90 degrees the west edge comes from the northernmost vertex.
+    const target=[bim.originX-b.ymax,bim.originX-b.ymin,bim.originY+b.xmin,bim.originY+b.xmax,
+      bim.originZ+b.zmin,bim.originZ+b.zmax];
     const actual=worldBounds(product,ref(mesh.Coordinates).CoordList.map(v=>v.map(n=>n.value)));
     actual.forEach((v,k)=>near(v,target[k],.00001));
     truth[product.GlobalId.value]=target.map(n=>n/1000);

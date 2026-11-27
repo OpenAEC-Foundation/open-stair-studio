@@ -1,0 +1,26 @@
+{
+  "app": "Open Stair Studio",
+  "units": "mm",
+  "project": {
+    "name": "BIM-vergelijking dichte steektrap",
+    "number": "OSS-BIM-01",
+    "revision": "A"
+  },
+  "stairwell": {"uid": "oss-bim-steektrap-vergelijking", "instances": []},
+  "stair": {
+    "mark": "ST-01",
+    "name": "Dichte steektrap",
+    "type": "straight",
+    "width": 880,
+    "floorHeight": 3000,
+    "going": 220,
+    "risers": 16,
+    "nosing": 45,
+    "treadThickness": 38,
+    "stringerThickness": 38,
+    "railSide": "none",
+    "riserBoards": "closed",
+    "riserJoint": "butt",
+    "riserThickness": 13
+  }
+}

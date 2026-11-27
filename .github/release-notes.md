@@ -2,6 +2,13 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.20
+
+- In IFC4 kun je houten treden, stootborden en bomen afzonderlijk selecteren en per vlucht terugvinden. De standaard IFC-eigenschappen geven de optredes, treden en beschikbare loopmaten. Nettovolumes staan op de fysieke houten onderdelen. Overeenkomstige onderdelen behouden hun GlobalId bij herexport en ontwerpwijzigingen.
+- Bij export van één trapcomponent of de hele componentopstelling worden het projectnulpunt en de rotatie meegenomen. De voet van de bomen bij verdreven kwart- en halfslagtrappen sluit op het vertrekpeil aan.
+- Onder **BIM** is naast IFC4 ook experimentele IFCX-alpha-uitvoer beschikbaar met de projectstructuur, wereldgeometrie en eigenschappen. De testbestanden zijn met IfcOpenShell en de IFCX-compositor van buildingSMART ingelezen.
+- De vergelijking met zeven De Vries-trappen en drie openbare gebouwmodellen bevat gemeten maatvoering, wel, draai en objectopbouw. [Meetrapport en bronbestanden](https://github.com/OpenAEC-Foundation/open-stair-studio/blob/v0.13.20/docs/bim-referentietrappen.md)
+
 ## Nieuw in 0.13.19
 
 - Kies onder **Houtdetails → Stootborden** het onderdeelmerk en klik op **Stootbord frezen**. Het blad levert LinuxCNC-programma’s voor de lippen, schouders en kopvlakken van het verticale bord. Bij een verdreven kwartslag of halfslag volgen de banen de draairichting en de ingestelde neuspositie.

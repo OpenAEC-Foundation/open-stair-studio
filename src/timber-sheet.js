@@ -12,7 +12,7 @@ export function timberSheetParts(geometry, details) {
     id: p.id, type: 'tread', name: p.name, profile: profileNames[p.noseDetail?.kind ?? 'square'],
     stock: [p.length, p.width, p.thickness], netVolume: p.volume, length: null, part: p
   }));
-  const railing = details.filter(p => Object.hasOwn(groupNames,p.role)).map(p => ({
+  const railing = details.filter(p => p.stockVolumeM3 > 0 && Object.hasOwn(groupNames,p.role)).map(p => ({
     id: p.id, type: p.role, name: p.label, profile: p.profileName ?? p.label,
     stock: [p.stockLengthMm, p.stockWidthMm, p.stockThicknessMm],
     netVolume: p.volumeM3, length: p.lengthMm, part: p

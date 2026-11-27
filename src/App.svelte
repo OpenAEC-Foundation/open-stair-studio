@@ -39,6 +39,7 @@
 
   function freshDesign() {
     const project=structuredClone(starterProject);
+    project.bim.modelId = crypto.randomUUID();
     Object.assign(project.stair,newDesignDetails,{timberDetail:'modern',noseProfile:'round',railSide:'none',riserJoint:'housed'});
     return project;
   }
@@ -112,7 +113,7 @@
     if (wellItem && window.confirm(wellItem.mark+' uit het trappenhuis verwijderen?'))
       saveWell({...well,instances:well.instances.filter(i=>i.id!==wellItem.id)});
   }
-  async function exportWellIfc(scope='selected') {
+  async function exportWellIfc(scope='selected', format='ifc') {
     if(exportingWell) return;
     exportingWell=true;
     const source=model, item=wellItem;
@@ -120,9 +121,9 @@
       const {createStairwellIfc}=await import('./stairwell-ifc.js');
       const full=scope==='project';
       const target=full?source.stairwell:{...source.stairwell,instances:[item]};
-      const bytes=await createStairwellIfc(source.project,target);
-      downloadFile(source.project.number+'-'+(full?'projectopstelling':item.mark)+'.ifc',bytes,'application/x-step');
-      notify((full?'Gehele projectopstelling':item.mark)+' als IFC4 geëxporteerd');
+      const bytes=await createStairwellIfc(source.project,target,source.bim);
+      await downloadBim(source.project.number+'-'+(full?'projectopstelling':item.mark), bytes, format);
+      notify((full?'Gehele projectopstelling':item.mark)+' als '+(format==='ifcx'?'IFCX alpha':'IFC4')+' geëxporteerd');
     } catch(error){notify(error.message);} finally{exportingWell=false;}
   }
   let rightTab = 'Eigenschappen';
@@ -366,7 +367,15 @@
     downloadFile(`${model.stair.mark}-plattegrond.dxf`, dxf, 'application/dxf');
     notify('2D-contour als DXF geëxporteerd · mm');
   }
-  async function exportIfc() {
+  async function downloadBim(name, bytes, format) {
+    if (format==='ifcx') {
+      const {createIfcx}=await import('./ifc-export.js');
+      const layer=await createIfcx(bytes);
+      downloadFile(name+'.ifcx',JSON.stringify(layer),'application/json');
+    } else downloadFile(name+'.ifc',bytes,'application/x-step');
+  }
+  async function exportIfc(format='ifc') {
+    if (activeView==='Trapontwerp' && wellItem) return exportWellIfc('selected',format);
     if (!model.stairEnabled) return notify('Kies eerst een traptype.');
     if (invalidGeometry) return notify(invalidGeometry.detail);
     const exportModel = model;
@@ -374,11 +383,11 @@
     try {
       const { createIfc4 } = await import('./ifc-export.js');
       const result = await createIfc4(exportModel, exportGeometry);
-      downloadFile(`${exportModel.stair.mark}-coordinatiemodel.ifc`, result.bytes, 'application/x-step');
-      notify(`IFC4-coördinatiemodel geëxporteerd · ${result.flightCount} vlucht(en), ${result.landingCount} bordes(sen), ${result.solidCount} solids`);
+      await downloadBim(exportModel.stair.mark+'-coordinatiemodel', result.bytes, format);
+      notify(`${format==='ifcx'?'IFCX alpha':'IFC4'} geëxporteerd · ${result.flightCount} vlucht(en), ${result.landingCount} bordes(sen)`);
     } catch (error) {
-      console.error('IFC4 export failed', error);
-      notify(`IFC4 export mislukt: ${error.message}`);
+      console.error('BIM export failed', error);
+      notify(`BIM-export mislukt: ${error.message}`);
     }
   }
   function chooseFamily(type) {
@@ -397,7 +406,9 @@
     if (dirty && !window.confirm('Het houtvoorbeeld openen en de huidige onopgeslagen wijzigingen verwerpen?')) return;
     openRequest++;
     resetPartSelection();resetCamera();woodView='all';
-    commitSession(startSession(readProject(timberExample)), 'Voorbeeld met klassieke houtdetails geopend');
+    const example = readProject(timberExample);
+    example.bim.modelId = crypto.randomUUID();
+    commitSession(startSession(example), 'Voorbeeld met klassieke houtdetails geopend');
     activeView='3D-model';activeRibbon='Trap ontwerpen';rightTab='Eigenschappen';
   }
   function saveProject() {
@@ -515,13 +526,13 @@
         </select></div>
       {#if activeView==='Trapontwerp' && wellItem}
         <div class="ribbon-group"><div class="ribbon-group-buttons">{#each ['3D','Plattegrond','Aanzicht','Onderdelen'] as v}<button class="ribbon-command" onclick={()=>wellWorkspace?.showMode(v)}><Icon name={v==='3D'?'bim.workspace':v==='Onderdelen'?'planning.cut-list':'frame.layout'} size={22}/><span>{v}</span></button>{/each}</div><small>{wellItem.mark} · ontwerp</small></div>
-        <div class="ribbon-group"><div class="ribbon-group-buttons"><button class="ribbon-command" onclick={exportWellIfc} disabled={exportingWell}><Icon name="ifc.export" size={22}/><span>IFC4 exporteren</span></button><button class="ribbon-command" onclick={()=>addWell(wellItem.type)}><Icon name="file.new" size={22}/><span>Extra exemplaar</span></button></div><small>Project</small></div>
+        <div class="ribbon-group"><div class="ribbon-group-buttons"><button class="ribbon-command" onclick={()=>exportWellIfc()} disabled={exportingWell}><Icon name="ifc.export" size={22}/><span>IFC4 exporteren</span></button><button class="ribbon-command" onclick={()=>exportWellIfc('selected','ifcx')} disabled={exportingWell}><Icon name="ifc.export" size={22}/><span>IFCX alpha</span></button><button class="ribbon-command" onclick={()=>addWell(wellItem.type)}><Icon name="file.new" size={22}/><span>Extra exemplaar</span></button></div><small>Project</small></div>
       {:else}
         <div class="ribbon-group"><div class="ribbon-group-buttons"><button class="ribbon-command" onclick={()=>activeView='3D-model'}><Icon name="bim.workspace" size={22}/><span>3D-model</span></button><button class="ribbon-command" onclick={()=>activeView='Plattegrond'}><Icon name="drawing.settings" size={22}/><span>Plattegrond</span></button><button class="ribbon-command" onclick={()=>activeView='Houtdetails'}><Icon name="profile.manage" size={22}/><span>Houtdetails</span></button><button class="ribbon-command" onclick={showWangbladen}><Icon name="frame.editor" size={22}/><span>Wangbladen</span></button></div><small>Ontwerp en werkplaats</small></div>
       {/if}
       <div class="ribbon-group"><div class="ribbon-group-buttons"><button class="ribbon-command" onclick={()=>openWell()}><Icon name="file.structure" size={22}/><span>Projectopstelling</span></button><button class="ribbon-command" onclick={openTimberExample}><Icon name="profile.manage" size={22}/><span>Klassieke houten kwartslag</span></button></div><small>Bouwlagen</small></div>
     {:else if activeView==='Trapontwerp' && wellItem}
-      <div class="ribbon-group"><div class="ribbon-group-buttons">{#each ['3D','Ontwerpcontrole',...(activeStructural?['Berekening','Verbindingen']:[]),'Onderdelen'] as v}<button class="ribbon-command" onclick={()=>wellWorkspace?.showMode(v)}><Icon name={v==='3D'?'bim.workspace':v==='Onderdelen'?'planning.cut-list':'validation.workspace'} size={22}/><span>{v}</span></button>{/each}<button class="ribbon-command" onclick={exportWellIfc} disabled={exportingWell}><Icon name="ifc.export" size={22}/><span>IFC4 exporteren</span></button></div><small>{wellItem.mark} · {typeOf(wellItem.type).label}</small></div>
+      <div class="ribbon-group"><div class="ribbon-group-buttons">{#each ['3D','Ontwerpcontrole',...(activeStructural?['Berekening','Verbindingen']:[]),'Onderdelen'] as v}<button class="ribbon-command" onclick={()=>wellWorkspace?.showMode(v)}><Icon name={v==='3D'?'bim.workspace':v==='Onderdelen'?'planning.cut-list':'validation.workspace'} size={22}/><span>{v}</span></button>{/each}<button class="ribbon-command" onclick={()=>exportWellIfc()} disabled={exportingWell}><Icon name="ifc.export" size={22}/><span>IFC4 exporteren</span></button><button class="ribbon-command" onclick={()=>exportWellIfc('selected','ifcx')} disabled={exportingWell}><Icon name="ifc.export" size={22}/><span>IFCX alpha</span></button></div><small>{wellItem.mark} · {typeOf(wellItem.type).label}</small></div>
     {:else if activeRibbon === 'Engineering'}
       <div class="ribbon-group"><div class="ribbon-group-buttons"><button class="ribbon-command" onclick={() => activeView = 'Engineering'}><Icon name="calculation.recalculate" size={24}/><span>Engineering-<br/>dossier</span></button><button class="ribbon-command" onclick={() => activeView = '3D-model'}><Icon name="bim.workspace" size={24}/><span>Trapmodel<br/>bekijken</span></button></div><small>Materiaal en lastwerking</small></div>
     {:else if activeRibbon === 'Controleren'}
@@ -535,7 +546,7 @@
       <div class="ribbon-group"><div class="ribbon-group-buttons"><button class="ribbon-command" onclick={() => activeView = 'CNC-machine'}><Icon name="frame.cnc" size={24} /><span>Wangen<br />frezen</span></button><button class="ribbon-command" onclick={() => openTreadCam(selectedPart?.id)}><Icon name="frame.cnc" size={24} /><span>Treden<br />frezen</span></button><button class="ribbon-command" onclick={showWangbladen}><Icon name="calculation.recalculate" size={24} /><span>Wangblad<br />bekijken</span></button></div><small>CAM-profiel</small></div>
 
     {:else}
-      <div class="ribbon-group"><div class="ribbon-group-buttons"><button class="ribbon-command" onclick={() => activeView = 'BIM-model'}><Icon name="ifc.workspace" size={24} /><span>BIM-model<br />bekijken</span></button><button class="ribbon-command" onclick={exportIfc}><Icon name="ifc.export" size={24} /><span>IFC4<br />exporteren</span></button></div><small>OpenBIM · coördinatie</small></div>
+      <div class="ribbon-group"><div class="ribbon-group-buttons"><button class="ribbon-command" onclick={() => activeView = 'BIM-model'}><Icon name="ifc.workspace" size={24} /><span>BIM-model<br />bekijken</span></button><button class="ribbon-command" onclick={()=>exportIfc()}><Icon name="ifc.export" size={24} /><span>IFC4<br />exporteren</span></button><button class="ribbon-command" onclick={()=>exportIfc('ifcx')}><Icon name="ifc.export" size={24} /><span>IFCX<br />alpha</span></button></div><small>OpenBIM · coördinatie</small></div>
       <div class="ribbon-group"><div class="ribbon-group-buttons"><button class="ribbon-command" onclick={()=>activeView='BIM-model'}><Icon name="bim.workspace" size={24} /><span>Gebouwmodel<br />inlezen</span></button></div><small>Contextmodel</small></div>
     {/if}
     <span class="ribbon-spacer"></span>
@@ -651,14 +662,14 @@
 
       {:else if activeView === 'BIM-model'}
         <div class="production-view bim-view">
-          <div class="production-head"><div><span class="eyebrow">OPENBIM · PROJECTOVERDRACHT</span><h1>Trap in gebouwcontext</h1><p>IFC4-coördinatie met typen, materialen, classificatie en projectplaatsing.</p></div><button class="action-btn" onclick={exportIfc}><Icon name="ifc.export" /> IFC4 exporteren</button></div>
+          <div class="production-head"><div><span class="eyebrow">OPENBIM · PROJECTOVERDRACHT</span><h1>Trap in gebouwcontext</h1><p>IFC4-coördinatie met typen, materialen, classificatie en projectplaatsing.</p></div><button class="action-btn" onclick={()=>exportIfc()}><Icon name="ifc.export" /> IFC4 exporteren</button><button class="action-btn" onclick={()=>exportIfc('ifcx')}><Icon name="ifc.export" /> IFCX alpha exporteren</button></div>
           <div class="production-summary"><div><span>Trapobject</span><b>{model.stair.mark} · {model.stair.name}</b></div><div><span>Projectnulpunt</span><b>{model.bim.originAgreed ? 'Afgestemd' : 'Nog af te stemmen'}</b></div><div><span>IFC-schema</span><b>IFC4</b></div><div><span>Gebouwmodel</span><b>{hostContext?.filename ?? 'Niet ingelezen'}</b></div></div>
           <div class="property-section"><h3>Gebouwmodel en sparing</h3><label for="host-ifc-file">IFC-bestand inlezen</label><input id="host-ifc-file" type="file" accept=".ifc,application/x-step" onchange={openHostIfc} disabled={hostLoading} />
             {#if hostContext}<p>{hostContext.slabs.length} {hostContext.slabs.length===1?'vloer':'vloeren'} · {hostContext.openings.length} {hostContext.openings.length===1?'sparing':'sparingen'} · {hostContext.voids.length} vloersparingsrelaties</p>{/if}
             <p role="status"><b>{hostFit.status==='precheck'?'Planpassing voorlopig':hostFit.status==='outside'?'Sparingscontour controleren':'Hostcontrole open'}</b> · {hostFit.message}</p>
             <small>De toets snijdt trap en gekoppelde sparing op het midden van elk vloerpeil. Controle van vrije hoogte, draagkracht, vloerhelling en ankers volgt projectmatig.</small>
           </div>
-          <div class="bim-placeholder"><Icon name="ifc.workspace" size={34} /><b>IFC4-coördinatiemodel</b><span>De houtbewerking staat op de werkplaatsbladen en in DXF/CNC. IFCX is nog in ontwikkeling bij buildingSMART. Externe BIM-validatie en acceptatie door het projectteam blijven nodig.</span></div>
+          <div class="bim-placeholder"><Icon name="ifc.workspace" size={34} /><b>IFC4-coördinatiemodel</b><span>IFCX alpha bevat de objectstructuur, eigenschappen en driehoeksgeometrie uit het IFC4-model. De experimentele indeling volgt het IFC5-ontwikkelproject van buildingSMART.</span></div>
         </div>
       {:else if activeView === '3D-model'}
         <div class="drawing-stage viewer-stage">

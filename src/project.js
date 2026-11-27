@@ -1,6 +1,7 @@
 import { ruleProfiles, stairFamilies, starterProject } from './stair.js';
 import { isWinder } from './winder.js';
 import { readWell } from './stairwell.js';
+import { ifcModelId } from './ifc-identity.js';
 import {timberDimensions, timberStyles, noseNames} from './timber-settings.js';
 import { validateCamField } from './housing-cam.js';
 import { validateTreadCamField } from './tread-cam.js';
@@ -126,6 +127,13 @@ export function readProject(raw) {
     for (const key of Object.keys(defaults)) {
       if (Object.hasOwn(raw[section], key)) model[section][key] = readField(section, key, raw[section][key]);
     }
+  }
+  model.bim.modelId = ifcModelId(raw);
+  if (!model.stairwell.uid && model.stairwell.instances.length) {
+    // Migrate the namespace formerly chosen at export time before a component
+    // selection, project rename or first edit can change it.
+    const previousScope = model.project.number || model.stairwell.instances[0].id;
+    model.stairwell.uid = /^[\w-]{1,64}$/.test(previousScope) ? previousScope : model.bim.modelId;
   }
   if (isWinder(model.stair.type)) model.stair.riserPosition = 'auto';
   if (!raw.engineering && model.regulatory.profile === 'NL_NEW_EGRESS') model.engineering.use = 'escape-only';

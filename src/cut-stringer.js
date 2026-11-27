@@ -1,13 +1,13 @@
 import earcut from 'earcut';
 import Drawing from 'dxf-writer';
 import { housedRisers } from './timber-riser.js';
+import { signedMeshVolume } from './components/solids.js';
 
 const round=n=>Number(n.toFixed(3));
 const area=points=>Math.abs(points.reduce((sum,p,i)=>{
   const q=points[(i+1)%points.length];
   return sum+p.x*q.z-q.x*p.z;
 },0))/2;
-const triangleVolume=(a,b,c)=>(a.x*(b.y*c.z-b.z*c.y)+a.y*(b.z*c.x-b.x*c.z)+a.z*(b.x*c.y-b.y*c.x))/6;
 
 // A keepboom has horizontal seats under the treads and a sloping underside.
 // stringerDepth is the minimum vertical web below each seat corner.
@@ -51,9 +51,7 @@ export function makeCutStringer(stair,flight,side,normal,rise) {
     const next=(i+1)%size;
     faces.push([i,next,next+size,i+size]);
   }
-  let signed=0;
-  for(const face of faces)for(let i=1;i<face.length-1;i++)
-    signed+=triangleVolume(vertices[face[0]],vertices[face[i]],vertices[face[i+1]]);
+  const signed = signedMeshVolume(vertices, faces);
   if(signed<0)for(const face of faces)face.reverse();
   const meshFaces=faces.map(face=>face.map(i=>vertices[i]));
   const c=Math.hypot(1,slope);

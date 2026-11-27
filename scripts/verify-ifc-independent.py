@@ -56,7 +56,7 @@ def verify_export(path, settings):
     model = ifcopenshell.open(str(path))
     assert model.schema == 'IFC4'
     assert model.by_type('IfcProject')[0].Name == expected['name']
-    products = model.by_type('IfcStairFlight') + model.by_type('IfcSlab')
+    products = model.by_type('IfcPlate') + model.by_type('IfcMember') + model.by_type('IfcSlab')
     solids = [item for product in products for rep in product.Representation.Representations for item in rep.Items]
     beams = expected['beams']
     pending_beams = {b['id']: b for b in beams}
@@ -82,7 +82,7 @@ def verify_export(path, settings):
             top = corners[np.abs(corners[:, 2] - tread['z']) < 1e-7, :2]
             assert len(top) >= 3 and has_vertices(top, tread['coords'])
     assert not pending_beams and not pending_treads
-    joints = verify_mitres(beams, shells)
+    joints = verify_mitres(beams, shells) if expected['winding'] else 0
     low, high = np.min(vertices, axis=0), np.max(vertices, axis=0)
     bounds = [*low[:2], *(high - low)[:2], high[2]]
     np.testing.assert_allclose(bounds, expected['bounds'], rtol=0, atol=1e-6)

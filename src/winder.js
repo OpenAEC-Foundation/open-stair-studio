@@ -2,6 +2,7 @@ import { buildStairViews } from './stair-views.js';
 import { goingBandWidth } from './going-band.js';
 import { buildWinderSchedule } from './winder-parts.js';
 import { housedRisers } from './timber-riser.js';
+import { signedMeshVolume } from './components/solids.js';
 
 const quarter = Math.PI / 2;
 const epsilon = 1e-7;
@@ -198,14 +199,24 @@ function beamBetween(a, b, outerA, outerB, side, stair, number) {
   const down = { x:tangent.x*axis.z, y:tangent.y*axis.z, z:-run/axisLength };
   const sideAxis = { x:-tangent.y, y:tangent.x, z:0 };
   const top = [a,b,outerB,outerA];
-  const bottom = top.map(p=>({ ...p,z:p.z-stair.stringerDepth }));
+  const bottom = top.map(p=>({ ...p,z:Math.max(0, p.z-stair.stringerDepth) }));
   const vertices = [...top,...bottom];
-  // Vertical drop is constant. Triangulate the top and bottom along matching
-  // diagonals because a board between two different mitres can have a twisted top.
-  const faces = [[0,1,2],[0,2,3],[6,5,4],[7,6,4]];
-  for (let i=0; i<4; i++) {
-    const j=(i+1)%4;
-    faces.push([i+4,j+4,j,i]);
+  // The underside follows two planes when mitred ends twist the top. Preserve
+  // their common diagonal when cutting the entire solid at the finished floor.
+  const startsBelow = a.z < stair.stringerDepth - epsilon;
+  const crossesFloor = startsBelow && b.z > stair.stringerDepth + epsilon;
+  let faces, housingOutline;
+  if (crossesFloor) {
+    const fraction = (stair.stringerDepth - a.z) / dz;
+    const floorPoint = (start, end) => ({...add(start, sub(end, start), fraction), z:0});
+    vertices.push(floorPoint(a,b), floorPoint(outerA,outerB), floorPoint(a,outerB));
+    // 8 and 9 are the inner and outer knees; 10 is on the original mesh diagonal.
+    faces = [[0,1,2],[0,2,3], [6,5,8,10],[9,6,10], [10,8,4],[7,9,10,4],
+      [4,8,5,1,0],[5,6,2,1],[6,9,7,3,2],[7,4,0,3]];
+    housingOutline = [0,1,5,8,4];
+  } else {
+    faces = [[0,1,2],[0,2,3],[6,5,4],[7,6,4],[4,5,1,0],[5,6,2,1],[6,7,3,2],[7,4,0,3]];
+    housingOutline = [0,1,5,4];
   }
   if (side<0) for (const face of faces) face.reverse();
   const meshFaces = faces.map(face=>face.map(i=>vertices[i]));
@@ -221,9 +232,9 @@ function beamBetween(a, b, outerA, outerB, side, stair, number) {
   const length = extent(axis), width = extent(down), thickness = stair.stringerThickness;
   const label = side>0 ? 'L' : 'R';
   return { id:`${stair.mark}-WG-${label}${number}`, name:`Wangsegment ${label}${number} · verstek`,
-    flightIndex:0, side, length, width, thickness, vertices, faces, meshFaces,
+    flightIndex:0, side, length, width, thickness, vertices, faces, meshFaces, housingOutline,
     grainDirection:axis, stockDepthDirection:down, stockThicknessDirection:sideAxis,
-    volume:polygonArea(points)*stair.stringerDepth/1e9, blankVolume:length*width*thickness/1e9,
+    volume:signedMeshVolume(vertices,faces)/1e9, blankVolume:length*width*thickness/1e9,
     points, svgPoints:svgPoints(points) };
 }
 

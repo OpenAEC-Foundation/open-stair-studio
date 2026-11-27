@@ -94,11 +94,18 @@ function verifyIfcValues(api, modelId, model, geometry) {
   const expectedTreads = new Map(geometry.treads.map(tread => [tread.id, tread]));
   const unmatchedBeams = new Set(geometry.stringers);
   let verifiedContours = 0;
+  const products = [];
   for (const component of components) {
-    if (component.type === IFC.IFCSTAIRFLIGHT) {
-      assert.equal(component.PredefinedType.value, windingType ? 'WINDER' : 'STRAIGHT');
-      if (windingType) assert.equal(component.TreadLength, null, 'winding treads have variable going');
+    if (component.type !== IFC.IFCSTAIRFLIGHT) {
+      products.push(component);
+      continue;
     }
+    assert.equal(component.PredefinedType.value, windingType ? 'WINDER' : 'STRAIGHT');
+    if (windingType) assert.equal(component.TreadLength, null, 'winding treads have variable going');
+    assert.equal(component.Representation, null, 'flight geometry is represented once, by its selectable children');
+    products.push(...children(component));
+  }
+  for (const component of products) {
     const [shape] = line(component.Representation).Representations.map(line);
     assert.equal(shape.RepresentationType.value,
       shape.Items.some(item => line(item).type === IFC.IFCFACETEDBREP) ? 'SolidModel' : 'SweptSolid');
@@ -178,8 +185,8 @@ function verifyFamily(api, family, turnDirection, outerShape) {
       bounds: [x, y, width, depth, model.stair.floorHeight].map(value => value / 1000),
       treads: geometry.treads.map(t => ({ key: t.id, volume: t.volume, z: t.elevation / 1000,
         coords: t.points.map(p => [p.x / 1000, p.y / 1000]) })),
-      beams: family.winder ? geometry.stringers.map(b => ({ id: b.id, side: b.side, volume: b.volume,
-        vertices: b.vertices.map(v => [v.x / 1000, v.y / 1000, v.z / 1000]) })) : []
+      beams: geometry.stringers.map(b => ({ id: b.id, side: b.side, volume: b.volume,
+        vertices: b.vertices.map(v => [v.x / 1000, v.y / 1000, v.z / 1000]) }))
     };
     writeFileSync(stem + '.ifc', result.bytes);
     writeFileSync(stem + '.json', JSON.stringify(expected));

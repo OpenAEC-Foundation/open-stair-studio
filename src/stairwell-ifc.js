@@ -1,4 +1,5 @@
 import { tessellate } from './ifc-tessellate.js';
+import { stairMeasureProperties } from './ifc-stair-properties.js';
 import * as IFC from 'web-ifc';
 import { assembleWell, elevationOf, heightOn, kindNames, levelsFor, materialNames, readWell, typeOf } from './stairwell.js';
 import { liftPlanFields } from './precast-plans.js';
@@ -38,7 +39,7 @@ async function compressedId(name) {
   return out;
 }
 
-export async function createStairwellIfc(project, input) {
+export async function createStairwellIfc(project, input, bim = {}) {
   const well = readWell(input);
   if (!well.instances.length) throw new Error('Plaats eerst een component in het trappenhuis.');
   const assemblies = assembleWell(well);
@@ -49,11 +50,11 @@ export async function createStairwellIfc(project, input) {
   const api = await library();
   const sid = api.CreateModel({schema:IFC.Schemas.IFC4, name:(project.number || 'OSS')+'-trappenhuis.ifc',
     description:['Design coordination of staircase components'], authors:['OpenAEC'], organizations:['OpenAEC'], authorization:'Concept'});
-  try { return await write(api,sid,project,well,assemblies); }
+  try { return await write(api,sid,project,well,assemblies,bim); }
   finally { api.CloseModel(sid); }
 }
 
-async function write(api, sid, project, well, assemblies) {
+async function write(api, sid, project, well, assemblies, bim) {
   const e = (type,...args) => api.CreateIfcEntity(sid,type,...args);
   const typed = (type,v) => api.CreateIfcType(sid,type,v);
   const label = s => typed(IFC.IFCLABEL,s), text = s => typed(IFC.IFCTEXT,s);
@@ -88,7 +89,8 @@ async function write(api, sid, project, well, assemblies) {
   const context = e(IFC.IFCGEOMETRICREPRESENTATIONCONTEXT,null,label('Model'),count(3),typed(IFC.IFCREAL,1e-5),origin,null);
   const projectObject = e(IFC.IFCPROJECT,guid(['project']),null,label(project.name || 'Trappenhuis'),text(project.number || ''),null,
     null,label(project.revision || ''),[context],units);
-  const sitePos = placement(), buildingPos = placement(sitePos);
+  const sitePos = placement(null,axis(bim.originX,bim.originY,bim.originZ,bim.originRotationDeg));
+  const buildingPos = placement(sitePos);
   const site = e(IFC.IFCSITE,guid(['site']),null,label(project.location || 'Projectlocatie'),null,null,sitePos,null,null,enumeration('ELEMENT'),null,null,null,null,null);
   const building = e(IFC.IFCBUILDING,guid(['building']),null,label('Trappenhuis'),null,null,buildingPos,null,null,enumeration('ELEMENT'),null,null,null);
   const links = [aggregate(['project-site'],projectObject,[site]),aggregate(['site-building'],site,[building])];
@@ -102,6 +104,7 @@ async function write(api, sid, project, well, assemblies) {
   function property(name,v,unitName,description) {
     let value, explicitUnit = null;
     if (typeof v === 'string') value = text(v);
+    else if (typeof v === 'boolean') value = typed(IFC.IFCBOOLEAN,v);
     else if (unitName === 'mm') value = length(v);
     else if (unitName === '°') value = typed(IFC.IFCPLANEANGLEMEASURE,v*Math.PI/180);
     else if (unitName === 'm³') value = typed(IFC.IFCVOLUMEMEASURE,v);
@@ -123,6 +126,17 @@ async function write(api, sid, project, well, assemblies) {
     const set = e(IFC.IFCPROPERTYSET,guid([...keys,'set',name]),null,label(name),null,props);
     links.push(relation(IFC.IFCRELDEFINESBYPROPERTIES,[...keys,'defines',name],Array.isArray(obj)?obj:[obj],set));
   }
+  function addMeasures(keys, object, name, measures) {
+    const properties = stairMeasureProperties(measures).map(([key, type, value]) =>
+      e(IFC.IFCPROPERTYSINGLEVALUE, label(key), null, typed(type, value), null));
+    if (properties.length) addSet(keys, object, name, properties);
+  }
+  addSet(['site'],site,'OSS_ProjectOrigin',[
+    property('OriginX_mm',bim.originX ?? 0,'mm'), property('OriginY_mm',bim.originY ?? 0,'mm'),
+    property('OriginZ_mm',bim.originZ ?? 0,'mm'),
+    e(IFC.IFCPROPERTYSINGLEVALUE,label('RotationDegrees'),null,typed(IFC.IFCREAL,bim.originRotationDeg ?? 0),null),
+    property('OriginAgreed',bim.originAgreed === true)
+  ]);
   function addStructural(keys,stair,products,result,i) {
     const {checks,connections,notes,status}=result;
     const byCheck=new Map(checks.map(check=>[check.id,[]]));
@@ -244,6 +258,11 @@ async function write(api, sid, project, well, assemblies) {
         ...precast.notes.map((note,index)=>property('Uitgangspunt '+(index+1),note))]);
     }
     const children = [], railing = [], treadFlights=new Map();
+    const flightMeasures = [];
+    function recordFlight(flightKeys, flight, measures) {
+      addMeasures(flightKeys, flight, 'Pset_StairFlightCommon', measures);
+      flightMeasures.push(measures);
+    }
     const c = Math.cos(i.rotation*Math.PI/180), s = Math.sin(i.rotation*Math.PI/180);
     const toLocal = p => [(p.x-i.x)*c+(p.y-i.y)*s,-(p.x-i.x)*s+(p.y-i.y)*c,p.z-elevation];
     const castFrames = new Map(), castObjects = new Map(), detailChildren = new Map();
@@ -312,6 +331,7 @@ async function write(api, sid, project, well, assemblies) {
             part.treadCount == null ? null : count(part.treadCount),
             part.rise == null ? null : typed(IFC.IFCPOSITIVELENGTHMEASURE,part.rise),
             part.going == null ? null : typed(IFC.IFCPOSITIVELENGTHMEASURE,part.going),enumeration('STRAIGHT'));
+          recordFlight(partKeys, element, {risers:part.risers, treads:part.treadCount, rise:part.rise, going:part.going});
           break;
         case 'fastener':
           if(part.fastenerType==='WELD') element=e(IFC.IFCFASTENER,...args,enumeration('WELD'));
@@ -326,6 +346,12 @@ async function write(api, sid, project, well, assemblies) {
       partCount++;
       if(products.has(part.id))throw new Error('Dubbel onderdeelmerk binnen '+i.mark+': '+part.id);
       products.set(part.id,element);
+      if (part.material === 'concrete' && ['flight','landing'].includes(part.kind)) {
+        const name = part.kind === 'flight' ? 'Qto_StairFlightBaseQuantities' : 'Qto_SlabBaseQuantities';
+        const volume = e(IFC.IFCQUANTITYVOLUME, label('GrossVolume'), null, null, typed(IFC.IFCVOLUMEMEASURE, part.volumeM3), null);
+        const quantities = e(IFC.IFCELEMENTQUANTITY, guid([...partKeys, name]), null, label(name), null, label('BaseQuantities'), [volume]);
+        links.push(relation(IFC.IFCRELDEFINESBYPROPERTIES, [...partKeys, 'defines', name], [element], quantities));
+      }
       if(part.fastenerType==='ANCHORBOLT')addSet(partKeys,element,'OSS_Anker',[
         property('Nominale diameter',part.diameterMm,'mm'),property('Schachtlengte',part.lengthMm,'mm'),
         property('Inbedding in ondergrond',part.embedMm,'mm')
@@ -406,7 +432,18 @@ async function write(api, sid, project, well, assemblies) {
         flightPos,null,null,riseCount?count(riseCount):null,count(treads.length),riseCount?typed(IFC.IFCPOSITIVELENGTHMEASURE,height/(i.params.risers??riseCount)):null,
         i.params.going?typed(IFC.IFCPOSITIVELENGTHMEASURE,i.params.going):null,enumeration(spiral?'SPIRAL':ladder?'USERDEFINED':'STRAIGHT'));
       children.push(flight);
+      if (!ladder) recordFlight([...keys, 'flight', group], flight, {
+        risers:riseCount, treads:treads.length, rise:height/(i.params.risers??riseCount), going:i.params.going
+      });
       links.push(aggregate([...keys,second?'flight-treads-'+group:'flight-treads'],flight,treads));
+    }
+    if (flightMeasures.length) {
+      const constant = key => flightMeasures.every(f => f[key] === flightMeasures[0][key]) ? flightMeasures[0][key] : null;
+      addMeasures(keys, stair, 'Pset_StairCommon', {
+        risers:flightMeasures.reduce((sum, f) => sum + f.risers, 0),
+        treads:flightMeasures.reduce((sum, f) => sum + f.treads, 0),
+        rise:constant('rise'), going:constant('going')
+      });
     }
     if (railing.length) {
       const rail = e(IFC.IFCRAILING,guid([...keys,'railing']),null,label(i.type==='loft'?'Handgreep':'Leuningwerk'),null,null,railPos,null,null,

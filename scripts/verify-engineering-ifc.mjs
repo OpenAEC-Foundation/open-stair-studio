@@ -40,7 +40,7 @@ function readExport(id, model, geometry) {
   if (timber) {
     assert.equal(stairProps.get('Material').NominalValue.value, model.stair.material);
     assert.equal(stairProps.get('HousingDepth_mm').NominalValue.value, model.joinery.depth);
-    assert.equal(entities(IFC.IFCPLATE).length, 0);
+    assert.deepEqual(entities(IFC.IFCPLATE).map(p => p.Tag.value).sort(), geometry.treads.map(t => t.id).sort());
     return;
   }
   const forbidden = ['Material', 'StringerType', 'TreadJoint', 'HousingDepth_mm', 'HousingTotalClearance_mm', 'HousingShoulder_mm'];

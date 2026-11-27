@@ -1,4 +1,16 @@
 // Closed boundary faces in local millimetres, with normals pointing outwards.
+export function signedMeshVolume(vertices, faces) {
+  let sixVolume = 0;
+  for (const face of faces) {
+    const a = vertices[face[0]];
+    for (let i = 1; i < face.length - 1; i++) {
+      const b = vertices[face[i]], c = vertices[face[i + 1]];
+      sixVolume += a.x * (b.y*c.z - b.z*c.y) + a.y * (b.z*c.x - b.x*c.z) + a.z * (b.x*c.y - b.y*c.x);
+    }
+  }
+  return sixVolume / 6;
+}
+
 function joined(bottom, top) {
   return [[...bottom].reverse(), top, ...bottom.map((p, i) => {
     const j = (i + 1) % bottom.length;

@@ -107,7 +107,7 @@
       <header><h2>{instance.mark} · {typeOf(instance.type).label}</h2><span>Vertrek op bouwlaag {floor} · {current.parts.length} onderdelen</span></header>
       {#if issues.length}<ul>{#each issues as i}<li><b>{i.mark}</b> · {i.text}</li>{/each}</ul>{/if}
       <details><summary>Maten en hoeveelheden</summary><dl>{#each current.metrics as m}<div><dt>{m.label}</dt><dd>{number(m.value)} {m.unit??''}</dd></div>{/each}</dl></details>
-      <div class="actions"><button class="action-btn" onclick={()=>exportIfc()}>Ontwerp als IFC4</button>{#if well.instances.length>1}<button class="action-btn" onclick={()=>exportIfc('project')}>Geheel project als IFC4</button>{/if}<button class="action-btn" onclick={printSheet}>Tekening afdrukken</button><button class="action-btn" onclick={csv}>Onderdelen als CSV</button></div>
+      <div class="actions"><button class="action-btn" onclick={()=>exportIfc()}>Ontwerp als IFC4</button><button class="action-btn" onclick={()=>exportIfc('selected','ifcx')}>Ontwerp als IFCX alpha</button>{#if well.instances.length>1}<button class="action-btn" onclick={()=>exportIfc('project')}>Geheel project als IFC4</button><button class="action-btn" onclick={()=>exportIfc('project','ifcx')}>Geheel project als IFCX alpha</button>{/if}<button class="action-btn" onclick={printSheet}>Tekening afdrukken</button><button class="action-btn" onclick={csv}>Onderdelen als CSV</button></div>
     </div>
     {#if printing && mode!=='Prefabdetails' && mode!=='Plaatwang' && !structuralMode}<article class="well-print">
       {#if scope==='building'}<div class="building-sheet"><h1>{project.number} · Trappenhuis</h1><p>{project.name} · revisie {project.revision} · gebouw-aanzicht · mm</p>

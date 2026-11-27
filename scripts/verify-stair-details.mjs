@@ -176,7 +176,9 @@ for(const type of ['straight','half_winder']) {
   const id=api.OpenModel(out.bytes);
   const elements=t=>{const ids=api.GetLineIDsWithType(id,t);return Array.from({length:ids.size()},(_,i)=>api.GetLine(id,ids.get(i)));};
   try {
-    const rails=elements(IFC.IFCRAILING),members=elements(IFC.IFCMEMBER),plates=elements(IFC.IFCPLATE);
+    const rails=elements(IFC.IFCRAILING);
+    const members=elements(IFC.IFCMEMBER).filter(e=>e.PredefinedType.value!=='STRINGER');
+    const plates=elements(IFC.IFCPLATE).filter(e=>e.ObjectType.value!=='Houten trede');
     for(const e of [...rails,...members,...plates]) {
       const p=parts.find(p=>p.id===e.Tag.value);
       assert(p,e.Tag.value);

@@ -35,7 +35,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.19',
+  version: '0.13.20',
   stairEnabled: true,
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
@@ -45,7 +45,7 @@ export const starterProject = {
   joinery: { type: 'housed', ...defaultHousingSettings },
   cam: { ...defaultCam },
   project: { name: 'Woonhuis De Linde', number: 'OSS-2026-001', revision: 'A', client: '', location: '' },
-  bim: { originX: 0, originY: 0, originZ: 0, originRotationDeg: 0, originAgreed: false },
+  bim: { modelId: '4d34c660-42d9-4dbe-b053-47fdd9597f77', originX: 0, originY: 0, originZ: 0, originRotationDeg: 0, originAgreed: false },
   regulatory: { profile: 'NL_NEW_HOME', construction: 'new', occupancy: 'residential', egressOnly: false, headroom: null },
   building: { openingWidth: 1200, openingLength: 4600, upperLandingWidth: 900, upperLandingDepth: 900 },
   estimate: { timberPricePerM3: 2400, laborHours: 14, laborRate: 62, wasteFactor: 1.18, overheadPercent: 12, marginPercent: 20, treadStock: 'board', fastenerUnitPrice: 0 },

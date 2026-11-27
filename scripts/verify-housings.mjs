@@ -12,7 +12,7 @@ const near=(a,b,name='measure')=>assert(Math.abs(a-b)<eps,`${name}: ${a} vs ${b}
 const area=p=>Math.abs(p.reduce((v,a,i)=>{const b=p[(i+1)%p.length];return v+a.x*b.y-a.y*b.x;},0)/2);
 const cross2=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
 
-function insideStock(beam,p) {
+function insideStock(beam,p,verticalDepth) {
   if (!beam.vertices) {
     // Independent projection onto the original gross prism.
     const {origin,axis,sideAxis,down}=beam.frame, d=sub(p,origin);
@@ -24,7 +24,7 @@ function insideStock(beam,p) {
   // The winding segment has a triangulated, possibly twisted top and a
   // matching bottom. Locate actual XY in a triangle and interpolate its Z.
   const v=beam.vertices;
-  if (beam.housingOutline) {
+  if (beam.frame) {
     const center=v.reduce((sum,q)=>({x:sum.x+q.x/v.length,y:sum.y+q.y/v.length,z:sum.z+q.z/v.length}),{x:0,y:0,z:0});
     for (const face of beam.faces) {
       const [a,b,c]=face.map(i=>v[i]);
@@ -39,7 +39,7 @@ function insideStock(beam,p) {
     const w=[cross2(p,v[j],v[k]),cross2(v[i],p,v[k]),cross2(v[i],v[j],p)].map(x=>x/denom);
     if (Math.min(...w)<-eps) continue;
     const top=w[0]*v[i].z+w[1]*v[j].z+w[2]*v[k].z;
-    const bottom=w[0]*v[i+4].z+w[1]*v[j+4].z+w[2]*v[k+4].z;
+    const bottom=Math.max(0, top-verticalDepth);
     assert(p.z>=bottom-eps && p.z<=top+eps, beam.id+' cuts outside real material height');
     return;
   }
@@ -65,7 +65,7 @@ function check(stair,settings) {
     near(zAxis.z,0,'inside face vertical');
     for(const vertex of job.outline) {
       assert(vertex.x>=-eps && vertex.x<=job.length+eps && vertex.y>=-eps && vertex.y<=job.width+eps);
-      insideStock(beam,pointOnHousingFrame(job.frame,vertex));
+      insideStock(beam,pointOnHousingFrame(job.frame,vertex),stair.stringerDepth);
     }
     for (const pocket of job.pockets) {
       assert(!allPockets.has(pocket.id));
@@ -77,7 +77,7 @@ function check(stair,settings) {
         const top=pointOnHousingFrame(job.frame,point);
         near(mag(sub(top,pocket.worldContour[i])),0,'pocket setup back to world');
         for (const z of [0,-depth/2,-depth]) {
-          insideStock(beam,pointOnHousingFrame(job.frame,point,z));
+          insideStock(beam,pointOnHousingFrame(job.frame,point,z),stair.stringerDepth);
           for(const {a,b,c,d} of job.stockPlanes) assert(a*point.x+b*point.y+c*z<=d+eps);
         }
       }
@@ -101,7 +101,7 @@ function check(stair,settings) {
       for(const [index,p] of tongue.points.entries()) {
         near(dot(sub({...p,z:t.elevation},job.frame.origin),job.frame.zAxis),
           [1,2].includes(index)?-depth:0,'tongue inside correct face');
-        insideStock(geometry.stringers.find(b=>b.id===job.id),{...p,z:t.elevation});
+        insideStock(geometry.stringers.find(b=>b.id===job.id),{...p,z:t.elevation},stair.stringerDepth);
       }
       addedArea+=area(tongue.points);
     }

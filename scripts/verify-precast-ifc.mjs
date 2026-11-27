@@ -44,6 +44,7 @@ for (const rel of rows(IFC.IFCRELAGGREGATES)) for (const child of rel.RelatedObj
 const sets=new Map();
 for (const rel of rows(IFC.IFCRELDEFINESBYPROPERTIES)) {
   const set=ref(rel.RelatingPropertyDefinition);
+  if (set.type === IFC.IFCELEMENTQUANTITY) continue;
   const props=new Map(set.HasProperties.map(ref).map(p=>[p.Name.value,p]));
   assert.equal(props.size,set.HasProperties.length,'Duplicate property name in '+set.Name.value);
   for (const handle of rel.RelatedObjects) {
