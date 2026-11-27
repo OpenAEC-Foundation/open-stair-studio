@@ -3,6 +3,8 @@ import { goingBandWidth } from './going-band.js';
 import { buildWinderSchedule } from './winder-parts.js';
 import { housedRisers, legacyFrontLip, riserPlaneOffset } from './timber-riser.js';
 import { signedMeshVolume } from './components/solids.js';
+import { dimensionedRoute, usesOuterDimensions } from './dimensioned-winder.js';
+import { quarterAngleError } from './two-quarter-settings.js';
 
 const quarter = Math.PI / 2;
 const epsilon = 1e-7;
@@ -15,16 +17,29 @@ const clamp = (v, low, high) => Math.min(high, Math.max(low, v));
 const svgPoints = points => points.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
 const polygonArea = points => points.reduce((sum, p, i) => sum + cross(p, points[(i + 1) % points.length]), 0) / 2;
 export const isWinder = type => ['quarter_winder', 'half_winder', 'two_quarter_winder'].includes(type);
+const fittedCuts = new WeakMap();
+
+function edgeClearance(a, b, c, d) {
+  const u=sub(b,a), v=sub(d,c), w=sub(c,a), determinant=cross(u,v);
+  if (Math.abs(determinant)>epsilon) {
+    const s=cross(w,v)/determinant, t=cross(w,u)/determinant;
+    if (s>=0 && s<=1 && t>=0 && t<=1) return 0;
+  }
+  const distance=(point,start,axis)=>mag(sub(point,add(start,axis,clamp(dot(sub(point,start),axis)/dot(axis,axis),0,1))));
+  return Math.min(distance(a,c,v),distance(b,c,v),distance(c,a,u),distance(d,a,u));
+}
 
 export function deriveWinder(stair, family) {
   const risers = clamp(Math.round(Number(stair.risers) || 2), 2, 80);
   const treadCount = risers - 1;
   const going = Number(stair.going);
   const rise = Number(stair.floorHeight) / risers;
-  const perQuarter = stair.windersPerQuarter ?? 4;
+  const dimensioned = usesOuterDimensions(stair);
+  const perQuarter = dimensioned ? (stair.firstQuarterAngles?.length ?? 0) : (stair.windersPerQuarter ?? 4);
+  const upperCount = dimensioned ? (stair.secondQuarterAngles?.length ?? 0) : perQuarter;
   const quarters = stair.type === 'quarter_winder' ? 1 : 2;
   const middleSteps = stair.type === 'two_quarter_winder' ? (stair.middleSteps ?? 5) : 0;
-  const turnSteps = quarters * perQuarter;
+  const turnSteps = perQuarter + (quarters === 2 ? upperCount : 0);
   const remaining = treadCount - turnSteps - middleSteps;
   const entrySteps = (stair.entrySteps ?? -1) === -1 ? Math.floor(remaining / 2) : stair.entrySteps;
   const radius = perQuarter * going / quarter;
@@ -39,10 +54,29 @@ export function deriveWinder(stair, family) {
     : clearWidth / 2;
   const flight = { index: 0, firstRiser: 0, label: 'Doorlopende vlucht', risers, treadCount,
     origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } };
-  return { family, risers, treadCount, flightCount: 1, flightRisers: [risers], flightHeights: [Number(stair.floorHeight)],
+  const dimensions = { family, risers, treadCount, flightCount: 1, flightRisers: [risers], flightHeights: [Number(stair.floorHeight)],
     rise, totalRun: treadCount * going, pitch: Math.atan2(rise, going) * 180 / Math.PI, flights: [flight],
     landingTravel: 0, perQuarter, turnSteps, middleSteps, entrySteps, exitSteps: remaining - entrySteps, radius,
     clearWidth, walklineClearance, angle: quarters * quarter };
+  if (!dimensioned) return dimensions;
+  Object.assign(dimensions,{dimensioned:true,upperCount,radius:null,walklineClearance:0,walklineStations:[]});
+  if (basicIssues(stair,dimensions).length) return dimensions;
+  const cuts=makeCuts(stair,dimensions);
+  fittedCuts.set(dimensions,cuts);
+  if (!cuts?.fronts) return dimensions;
+  const stations=[0];
+  let clearance=Infinity;
+  for (let i=1; i<cuts.fronts.length; i++) {
+    const a=cuts.fronts[i-1].at, b=cuts.fronts[i].at;
+    stations.push(stations.at(-1)+mag(sub(b,a)));
+    for (const rail of cuts.sides) for (let j=1; j<rail.length; j++)
+      clearance=Math.min(clearance,edgeClearance(a,b,rail[j-1],rail[j]));
+  }
+  dimensions.walklineClearance=clearance;
+  dimensions.walklineStations=stations;
+  dimensions.totalRun=stations.at(-1);
+  dimensions.pitch=Math.atan2(rise*treadCount,dimensions.totalRun)*180/Math.PI;
+  return dimensions;
 }
 
 // Station measures distance along the walking line. At each side rail the
@@ -155,9 +189,11 @@ function interval(rail, first, last) {
 }
 
 function makeCuts(stair, d) {
-  const { route, stations, sides, section } = makeRoute(stair, d);
+  const layout = d.dimensioned ? dimensionedRoute(stair,d) : makeRoute(stair,d);
+  if (layout.invalid) return {issue:'Er is te weinig ruimte voor de kwarten tussen de rechte vluchten. Vergroot de buitenmaat of verklein de vluchtbreedte of het rechte tussenstuk.'};
+  const { route, stations, sides, section } = layout;
   const housed = housedRisers(stair);
-  const boards = housed || (stair.wel!=null && stair.riserBoards==='closed');
+  const boards = housed || ((d.dimensioned || stair.wel!=null) && stair.riserBoards==='closed');
   const thickness = boards ? Number(stair.riserThickness) : 0;
   const offset = riserPlaneOffset(stair), lip = legacyFrontLip(stair);
   if (!(lip>=0 && offset>=0) || (boards && !(thickness>0))) return null;
@@ -171,6 +207,9 @@ function makeCuts(stair, d) {
   }
   for (let i = 0; i <= d.treadCount; i++) {
     const front = intersect(section(i * stair.going - Number(stair.nosing||0)), 0);
+    if (d.dimensioned && front.hits.every(Boolean)) {
+      front.at = add(front.hits[0].point,sub(front.hits[1].point,front.hits[0].point),.5);
+    }
     fronts.push(front);
     noses.push(lip && i < d.treadCount ? intersect(front,-lip) : front);
     const face = offset ? intersect(front,offset) : front;
@@ -184,11 +223,18 @@ function makeCuts(stair, d) {
     if (!nose || !fronts[i].hits[side] || !face || !back || nose.index > face.index + epsilon || back.index < face.index - epsilon) return null;
     if (i && (nose.index<=noses[i-1].hits[side].index+epsilon ||
         face.index<=boardBacks[i-1].hits[side].index+epsilon)) return null;
-    if (stair.wel==null && i && nose.index<=seatEnds[i-1].hits[side].index+epsilon) return null;
+    if (!d.dimensioned && stair.wel==null && i && nose.index<=seatEnds[i-1].hits[side].index+epsilon) return null;
   }
   const cuts = { route, sides, fronts, noses, faces, boardBacks, seatEnds, boards };
   cuts.rails = sides.map((rail,sideIndex) => railStock(rail,sideIndex,cuts,stair.stringerThickness));
   if (cuts.rails.some(rail => !rail)) return { issue:'De eindzaagsnede kruist het verstek van een wangsegment. Verplaats de tredepositie of voeg een rechte aan- of uitloop toe.' };
+  if (d.dimensioned) {
+    const inside = p => p.x >= route.minX-epsilon && p.x <= route.minX+stair.outerDepth+epsilon &&
+      p.y >= -epsilon && p.y <= stair.outerLength+epsilon;
+    const cutFits = plane => plane.hits.every(hit => inside(hit.point));
+    if (![...noses,...faces,...boardBacks].every(cutFits) || cuts.rails.some(rail=>!rail.outside.every(inside)))
+      return {issue:'Een trede, stootbord of wang steekt bij de opgegeven draaihoeken buiten de ingestelde buitenmaat. Vergroot de buitenmaat of wijzig de verdrijving.'};
+  }
   return cuts;
 }
 
@@ -197,11 +243,18 @@ function basicIssues(stair, d) {
     || !Number.isFinite(stair.nosing) || stair.nosing < -60 || stair.nosing > 100 || !Number.isInteger(stair.risers) || stair.risers < 2 || stair.risers > 80) return ['Vul geldige trap- en houtmaten en een geldige neuspositie in.'];
   if (stair.turnDirection && !['left','right'].includes(stair.turnDirection)) return ['Kies linksom of rechtsom.'];
   if (stair.outerShape && !['square','faceted'].includes(stair.outerShape)) return ['Kies een haakse of een gefacetteerde buitenzijde.'];
+  if (d.dimensioned) {
+    if (![stair.outerLength,stair.outerDepth].every(x=>Number.isFinite(x)&&x>0))
+      return ['Vul twee positieve buitenmaten in.'];
+    const error = quarterAngleError(stair.firstQuarterAngles) || quarterAngleError(stair.secondQuarterAngles);
+    if (error) return [error];
+  }
   if (!Number.isInteger(d.perQuarter) || d.perQuarter < 2 || d.perQuarter > 8) return ['Kies twee tot acht boogtreden per kwartslag.'];
   if (stair.type === 'two_quarter_winder' && (!Number.isInteger(d.middleSteps) || d.middleSteps < 1)) return ['Kies minstens één hele rechte trede tussen de beide kwartslagen.'];
   const occupiedSteps = d.turnSteps + d.middleSteps;
   if (occupiedSteps > d.treadCount) return [`Voor deze trapvorm zijn minstens ${occupiedSteps + 1} optredes nodig.`];
   if (!Number.isInteger(d.entrySteps) || d.entrySteps < 0 || d.exitSteps < 0) return [`Kies nul tot ${d.treadCount - occupiedSteps} treden vóór de eerste bocht, of kies automatische verdeling.`];
+  if (d.dimensioned) return d.clearWidth>0 ? [] : ['De wangdiktes laten geen vrije tredebreedte over.'];
   if (d.clearWidth <= 0 || d.radius <= stair.width / 2 + epsilon) return ['De binnenstraal moet positief zijn. Kies meer boogtreden, een grotere aantrede of een smallere trap.'];
   const innerFacetDistance = (d.radius - d.clearWidth/2) * Math.cos(quarter/(2*d.perQuarter));
   if (innerFacetDistance <= stair.stringerThickness + epsilon) return ['De binnenwang heeft te weinig ruimte voor de verstekken. Vergroot de binnenstraal of verklein de wangdikte.'];
@@ -213,7 +266,7 @@ export function winderIssues(stair) {
   const d = deriveWinder(stair);
   const issues = basicIssues(stair, d);
   if (issues.length) return issues;
-  const cuts = makeCuts(stair,d);
+  const cuts = d.dimensioned ? fittedCuts.get(d) : makeCuts(stair,d);
   if (cuts?.issue) return [cuts.issue];
   if (cuts) return [];
   return [housedRisers(stair)
@@ -290,9 +343,16 @@ function railStock(rail, sideIndex, cuts, thickness) {
   // The inside rail starts at the nose and ends at the finished-floor riser.
   // Offset the sawn rail once, checking that each mitre still has material on
   // both sides when a moved end plane falls very close to a bend.
+  const fitted = cuts.route.dimensioned;
   const hits = cuts.fronts.map((front,i) =>
-    (i===cuts.fronts.length-1 ? cuts.faces[i] : front).hits[sideIndex]);
-  const first = hits[0], last = hits.at(-1);
+    (fitted || i===cuts.fronts.length-1 ? cuts.faces[i] : front).hits[sideIndex]);
+  const endCut = i => {
+    const a=rail[i], b=rail[i+1];
+    const fraction=(cuts.route.minX-a.x)/(b.x-a.x);
+    return {point:add(a,sub(b,a),fraction), index:i+fraction};
+  };
+  const first = fitted ? endCut(0) : hits[0];
+  const last = fitted ? endCut(rail.length-2) : hits.at(-1);
   const joints = [first];
   for (let j=Math.ceil(first.index+epsilon); j<last.index-epsilon; j++) joints.push({point:rail[j],index:j});
   joints.push(last);
@@ -301,7 +361,23 @@ function railStock(rail, sideIndex, cuts, thickness) {
   for (let j=1; j<joints.length; j++) {
     if (!(dot(sub(points[j],points[j-1]),sub(outside[j],outside[j-1])) > epsilon)) return null;
   }
-  return {rail,hits,joints,outside};
+  if (!fitted) return {rail,hits,joints,outside};
+  // A compact inside quarter rises several steps over a few centimetres.
+  // Follow the changing pitch at each riser instead of spanning those
+  // levels with a single chord. Keep both faces of every mitre coincident.
+  const sawnJoints=[joints[0]], sawnOutside=[outside[0]];
+  for (let i=1; i<joints.length; i++) {
+    const a=joints[i-1], b=joints[i];
+    for (const hit of hits) {
+      if (hit.index<=a.index+epsilon || hit.index>=b.index-epsilon) continue;
+      const t=mag(sub(hit.point,a.point))/mag(sub(b.point,a.point));
+      sawnJoints.push(hit);
+      sawnOutside.push(add(outside[i-1],sub(outside[i],outside[i-1]),t));
+    }
+    sawnJoints.push(b);
+    sawnOutside.push(outside[i]);
+  }
+  return {rail,hits,joints:sawnJoints,outside:sawnOutside};
 }
 
 function makeBeams(cuts, stair, rise, reflect) {
@@ -320,12 +396,23 @@ function makeBeams(cuts, stair, rise, reflect) {
       const s = chainage(joint.index);
       let i = 0;
       while (i < hits.length - 2 && treadStations[i + 1] < s) i++;
-      const fraction = (s - treadStations[i]) / (treadStations[i+1] - treadStations[i]);
+      let fraction = (s - treadStations[i]) / (treadStations[i+1] - treadStations[i]);
+      if (cuts.route.dimensioned) fraction = clamp(fraction,0,1);
       return { ...reflect(joint.point), z: (i + 1 + fraction) * rise };
     });
     const side = (sideIndex === 0 ? 1 : -1) * (stair.turnDirection === 'right' ? -1 : 1);
     const offset = outside.map((p,i)=>({...reflect(p),z:nodes[i].z}));
-    for (let j = 1; j < nodes.length; j++) beams.push(beamBetween(nodes[j-1], nodes[j], offset[j-1],offset[j],side,stair,j));
+    let from=0, number=0;
+    for (let j=1; j<nodes.length; j++) {
+      if (cuts.route.dimensioned && j+1<nodes.length) {
+        const a=nodes[from], b=nodes[j], c=nodes[j+1], u=sub(b,a), v=sub(c,b);
+        const collinear=Math.abs(cross(u,v))<epsilon*mag(u)*mag(v) && dot(u,v)>0;
+        const pitchChange=Math.abs((b.z-a.z)*mag(v)-(c.z-b.z)*mag(u));
+        if (collinear && pitchChange < .0001*(mag(u)+mag(v))) continue;
+      }
+      beams.push(beamBetween(nodes[from],nodes[j],offset[from],offset[j],side,stair,++number));
+      from=j;
+    }
   }
   return beams;
 }
@@ -333,7 +420,8 @@ function makeBeams(cuts, stair, rise, reflect) {
 export function generateWinderGeometry(stair, family, options) {
   const dimensions = deriveWinder(stair, family);
   const { rise, treadCount } = dimensions;
-  const candidate = basicIssues(stair, dimensions).length ? null : makeCuts(stair, dimensions);
+  const candidate = dimensions.dimensioned ? fittedCuts.get(dimensions) :
+    basicIssues(stair, dimensions).length ? null : makeCuts(stair, dimensions);
   const cuts = candidate?.issue ? null : candidate;
   const reflect = ({ x, y }) => ({ x, y: stair.turnDirection === 'right' ? -y : y });
   const treads = [], landings = [], walkline = [];
@@ -364,7 +452,8 @@ export function generateWinderGeometry(stair, family, options) {
         }
         return distance;
       };
-      const center = reflect(routePoint((i + .5) * stair.going - Number(stair.nosing||0), 0, cuts.route));
+      const center = reflect(dimensions.dimensioned ? add(front.at,sub(next.at,front.at),.5) :
+        routePoint((i + .5) * stair.going - Number(stair.nosing||0), 0, cuts.route));
       const widths = points.map(p => p.x), heights = points.map(p => p.y);
       const isWinder = Math.abs(front.angle - next.angle) > epsilon || (!dimensions.middleSteps && points.length > 4);
       const goingContour = polygon(...between(front,next));
@@ -384,7 +473,11 @@ export function generateWinderGeometry(stair, family, options) {
         depthAtWalkline: normalDepth(polygon(...visible),nose), narrowDepth: Math.min(...visible.map(edgeLength)),
         ...(cuts.boards ? {riserSeat:seat(i), ...(i===treadCount-1 ? {exitRiserSeat:seat(i+1)} : {})} : {}) });
     }
-    for (let i = 0; i <= treadCount * 8; i++) walkline.push(reflect(routePoint(i * stair.going / 8, 0, cuts.route)));
+    if (dimensions.dimensioned) {
+      for (const front of cuts.fronts) walkline.push(reflect(front.at));
+    } else {
+      for (let i = 0; i <= treadCount * 8; i++) walkline.push(reflect(routePoint(i * stair.going / 8, 0, cuts.route)));
+    }
   }
   const stringers = cuts ? makeBeams(cuts, stair, rise, reflect) : [];
   const layout = { treads, stringers, landings };

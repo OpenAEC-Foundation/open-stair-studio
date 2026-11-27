@@ -113,6 +113,7 @@ function writeModel(api, sid, model, geometry) {
   const stairPlacement = localPlacement(storeyPlacement);
   const stairType = stairTypes[stair.type] ?? 'NOTDEFINED';
   const windingFlight = d.family.winder === true;
+  const fixedEnvelope = stair.type === 'two_quarter_winder' && stair.twoQuarterLayout === 'dimensioned';
   const stairElement = e(IFC.IFCSTAIR, guid('stair'), null, label(`${stair.mark} · ${stair.name}`), text('Open Stair Studio · conceptmodel; niet voor productie of vergunningstoets'), label(stair.type), stairPlacement, null, identifier(stair.mark), enumValue(stairType));
   const millimetre = unit('LENGTHUNIT', 'MILLI', 'METRE');
   const singleProperty = ([name, type, value, propertyUnit = type === IFC.IFCLENGTHMEASURE ? millimetre : null]) =>
@@ -153,6 +154,7 @@ function writeModel(api, sid, model, geometry) {
     ['TreadPositionAlongWalkingLine_mm', IFC.IFCLENGTHMEASURE, stair.nosing],
     ...(!engineeredTreads ? [['DesignedNosingProjection_mm', IFC.IFCLENGTHMEASURE, effectiveWel(stair)]] : []),
     ...(stair.type === 'two_quarter_winder' ? [
+      ['TwoQuarterLayout', IFC.IFCLABEL, stair.twoQuarterLayout ?? 'automatic'],
       ['MiddleStraightTreads', IFC.IFCINTEGER, d.middleSteps],
       ['MiddleStraightRun_mm', IFC.IFCLENGTHMEASURE, d.middleSteps * stair.going]
     ] : []),
@@ -182,7 +184,17 @@ function writeModel(api, sid, model, geometry) {
     ...(windingFlight ? [
       ['TurnDirection', IFC.IFCLABEL, stair.turnDirection ?? 'left'],
       ['OuterShape', IFC.IFCLABEL, stair.outerShape ?? 'square'],
-      ['WindersPerQuarter', IFC.IFCINTEGER, d.perQuarter],
+      ...(fixedEnvelope ? [
+        ['DesignOuterLength_mm', IFC.IFCLENGTHMEASURE, stair.outerLength],
+        ['DesignOuterDepth_mm', IFC.IFCLENGTHMEASURE, stair.outerDepth],
+        ['MiddleStraightOffset_mm', IFC.IFCLENGTHMEASURE, stair.middleOffset],
+        ['DevelopedWalkingLineLength_mm', IFC.IFCLENGTHMEASURE, d.totalRun],
+        ...[['Lower',stair.firstQuarterAngles],['Upper',stair.secondQuarterAngles]].flatMap(([quarterName,angles]) => [
+          [quarterName+'QuarterWinders', IFC.IFCINTEGER, angles.length],
+          ...angles.map((degrees, i) => [quarterName+'QuarterAngle'+String(i+1).padStart(2,'0'),
+            IFC.IFCPLANEANGLEMEASURE, degrees*Math.PI/180])
+        ])
+      ] : [['WindersPerQuarter', IFC.IFCINTEGER, d.perQuarter]]),
       ['EntryTreads', IFC.IFCINTEGER, d.entrySteps],
       ['ExitTreads', IFC.IFCINTEGER, d.exitSteps]
     ] : [])

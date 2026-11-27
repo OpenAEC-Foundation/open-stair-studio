@@ -30,7 +30,7 @@
   import StairDetailControls from './StairDetailControls.svelte';
   import { createPlanDxf } from './plan-dxf.js';
   import { readHostIfc, checkHostFit } from './host-ifc.js';
-  import { draftKey, editSession, isDirty, parseInput, readProject, redoSession, restoreDraft, saveDraft, startSession, undoSession } from './project.js';
+  import { applyTwoQuarterReference, draftKey, editSession, isDirty, parseInput, readProject, redoSession, restoreDraft, saveDraft, startSession, undoSession } from './project.js';
   import { calculateEstimate, deriveStair, elevationPath, generateStairGeometry, inspectStair, ruleProfiles, stairFamilies, starterProject } from './stair.js';
 
   import TimberDetailSheet from './TimberDetailSheet.svelte';
@@ -240,7 +240,7 @@
   $: cncAllowance = treadStockAllowance(treadParts, model.treadCam.stockMargin);
   $: estimate = calculateEstimate(workshop, model.estimate, cncAllowance);
   $: errors = checks.filter(item => item.level === 'error').length;
-  $: outline = elevationPath(model.stair);
+  $: outline = elevationPath(model.stair,820,520,dimensions);
   $: stairTab = activeRibbon === 'Trapontwerp' ? 'Componenten, bouwlagen en plaatsing' : activeRibbon === 'Engineering' ? 'Tredesysteem, oplegging en vluchtroute' : activeRibbon === 'Trap ontwerpen' ? 'Traptype, geometrie en verbindingen' : activeRibbon === 'Werkvoorbereiding' ? 'Onderdelen, mallen en werkblad' : activeRibbon === 'CNC' ? 'Machine en bewerkingen' : activeRibbon === 'BIM' ? 'Model en uitwisseling' : activeRibbon === 'Controleren' ? 'Maatvoering en eisen' : 'Project en bewerken';
 
   onMount(() => {
@@ -402,6 +402,11 @@
     resetPartSelection();
     rightTab = 'Eigenschappen';
     activeView = stairFamilies.find(f => f.id === type)?.winder ? 'Plattegrond' : '3D-model';
+  }
+  function useTwoQuarterReference() {
+    commitSession(applyTwoQuarterReference(session), 'Voorbeeldmaten De Vries toegepast');
+    resetPartSelection();
+    activeView = 'Plattegrond';
   }
   function openTimberExample() {
     if (dirty && !window.confirm('Het houtvoorbeeld openen en de huidige onopgeslagen wijzigingen verwerpen?')) return;
@@ -707,7 +712,13 @@
               {/if}
               {#each details.filter(p=>p.axisPath) as p}<polyline points={p.axisPath.map(q=>q.x+','+(-q.y)).join(' ')} fill="none" stroke="var(--oa-accent-text)" stroke-width="1.4" vector-effect="non-scaling-stroke"><title>{p.label}</title></polyline>{/each}
               <line x1={geometry.footprint.x} y1={-geometry.footprint.y+95} x2={geometry.footprint.x+geometry.footprint.width} y2={-geometry.footprint.y+95} class="dimension-line" marker-start="url(#plan-arrow)" marker-end="url(#plan-arrow)" />
-              <text x={geometry.footprint.x+geometry.footprint.width/2} y={-geometry.footprint.y+155} class="plan-label" text-anchor="middle">{Math.round(geometry.footprint.width)} mm · buitenwerks model</text>
+              <text x={geometry.footprint.x+geometry.footprint.width/2} y={-geometry.footprint.y+160} class="plan-label" text-anchor="middle">{geometry.footprint.width.toLocaleString('nl-NL',{maximumFractionDigits:2})} mm{dimensions.dimensioned ? '' : ' · buitenwerks model'}</text>
+              {#if dimensions.dimensioned}
+                <g transform={'translate('+(geometry.footprint.x-80)+' '+(-geometry.footprint.y)+') rotate(-90)'}>
+                  <line x1="0" y1="0" x2={geometry.footprint.depth} y2="0" class="dimension-line" marker-start="url(#plan-arrow)" marker-end="url(#plan-arrow)" />
+                  <text x={geometry.footprint.depth/2} y="-18" class="plan-label" text-anchor="middle">{geometry.footprint.depth.toLocaleString('nl-NL',{maximumFractionDigits:2})} mm</text>
+                </g>
+              {/if}
             </svg>
           {:else if activeView === 'Doorsnede'}
             <svg class="drawing-view elevation" viewBox="0 0 820 520" role="img" aria-label="Trapdoorsnede en maatvoering">
@@ -716,7 +727,7 @@
               <path d={`${outline} L 688 410 L 105 410 Z`} class="stair-fill" />
               <path d={outline} class="stair-outline" />
               <line x1="80" y1="410" x2="80" y2="105" class="dimension-line" marker-start="url(#dim-arrow-elev)" marker-end="url(#dim-arrow-elev)" /><text x="52" y="270" class="dimension-text" transform="rotate(-90 52 270)">{model.stair.floorHeight} mm · vloerhoogte</text>
-              <line x1="105" y1="443" x2="688" y2="443" class="dimension-line" marker-start="url(#dim-arrow-elev)" marker-end="url(#dim-arrow-elev)"/><text x="290" y="466" class="dimension-text">{dimensions.totalRun} mm · ontwikkelde looplengte</text>
+              <line x1="105" y1="443" x2="688" y2="443" class="dimension-line" marker-start="url(#dim-arrow-elev)" marker-end="url(#dim-arrow-elev)"/><text x="290" y="466" class="dimension-text">{dimensions.totalRun.toLocaleString('nl-NL',{maximumFractionDigits:1})} mm · ontwikkelde looplengte</text>
               <text x="105" y="96" class="drawing-label">PEIL +{(model.stair.floorHeight / 1000).toFixed(3)}</text><text x="105" y="429" class="drawing-label">PEIL 0</text>
               <text x="105" y="65" class="drawing-label">UITGEVOUWEN LANGS DE {dimensions.family.winder ? 'KLIMLIJN' : 'MIDDENLIJN'} · SCHEMATISCH</text>
               <text x="458" y="195" class="drawing-note">{dimensions.risers} optredes × {dimensions.rise.toFixed(1)} mm</text>
@@ -754,13 +765,13 @@
             <label for="tread-system">Tredesysteem</label><select id="tread-system" value={model.engineering.structureType} onchange={e => { updateEngineering('structureType', e.currentTarget.value); selectRibbon('Engineering'); }}>{#each structureTypes as type}<option value={type.id}>{type.label}</option>{/each}</select>
           </div>
           {#if timberSystem && geometry.stringers.some(beam=>beam.profile!=='cut') && (activeView === 'Wangbladen' || activeView === 'CNC-machine')}<JoineryControls joinery={model.joinery} update={updateJoinery} riserGrooves={!!workshop.riserJoinery} />{/if}
-          {#if dimensions.family.winder}<WinderControls stair={model.stair} {geometry} {update} showPlan={() => activeView = 'Plattegrond'} />{/if}
+          {#if dimensions.family.winder}<WinderControls stair={model.stair} {geometry} {details} {update} applyReference={useTwoQuarterReference} showPlan={() => activeView = 'Plattegrond'} />{/if}
           <div class="property-section"><h3>Project en trap <span>⌃</span></h3><label for="project-name">Projectnaam</label><input class="text-field" id="project-name" value={model.project.name} oninput={e => updateRoot('project','name',e.currentTarget.value)} /><label for="project-number">Projectnummer</label><input class="text-field" id="project-number" value={model.project.number} oninput={e => updateRoot('project','number',e.currentTarget.value)} /><label for="project-revision">Revisie</label><input class="text-field" id="project-revision" value={model.project.revision} oninput={e => updateRoot('project','revision',e.currentTarget.value)} /><label for="project-client">Opdrachtgever</label><input class="text-field" id="project-client" value={model.project.client} oninput={e => updateRoot('project','client',e.currentTarget.value)} /><label for="project-location">Projectlocatie</label><input class="text-field" id="project-location" value={model.project.location} oninput={e => updateRoot('project','location',e.currentTarget.value)} /><label for="stair-mark">Trapmerk</label><input class="text-field" id="stair-mark" value={model.stair.mark} oninput={e => update('mark',e.currentTarget.value)} /><label for="stair-name">Trapomschrijving</label><input class="text-field" id="stair-name" value={model.stair.name} oninput={e => update('name',e.currentTarget.value)} /></div>
           <div class="property-section"><h3>Trapgeometrie <span>⌃</span></h3>
             <label for="floor-height">Vloerhoogte</label><div class="numeric-input"><input id="floor-height" type="number" min="100" max="10000" step="10" value={model.stair.floorHeight} onchange={e => update('floorHeight', e.currentTarget)} /><span>mm</span></div>
             <label for="stair-width">Trapbreedte buitenwerks · incl. bomen</label><div class="numeric-input"><input id="stair-width" type="number" min="300" max="3000" step="10" value={model.stair.width} onchange={e => update('width', e.currentTarget)} /><span>mm</span></div>
             <div class="field-pair"><div><label for="risers">Aantal optredes</label><div class="spinner"><button aria-label="Optrede minder" onclick={() => update('risers', Math.max(2, model.stair.risers - 1))}>−</button><input id="risers" type="number" min="2" max="40" value={model.stair.risers} onchange={e => update('risers', e.currentTarget)} /><button aria-label="Optrede meer" onclick={() => update('risers', Math.min(40, model.stair.risers + 1))}>＋</button></div></div><div><div class="field-label">Optrede</div><div class="computed-value">{dimensions.rise.toFixed(1)} <span>mm</span></div></div></div>
-            <label for="going">{dimensions.family.winder ? 'Stapafstand langs de klimlijn' : 'Aantrede'}</label><div class="numeric-input"><input id="going" type="number" min="100" max="600" step="5" value={model.stair.going} onchange={e => update('going', e.currentTarget)} /><span>mm</span></div>
+            <label for="going">{model.stair.type === 'two_quarter_winder' && model.stair.twoQuarterLayout === 'dimensioned' ? 'Aantrede recht tussenstuk' : dimensions.family.winder ? 'Stapafstand langs de klimlijn' : 'Aantrede'}</label><div class="numeric-input"><input id="going" type="number" min="100" max="600" step="any" value={model.stair.going} onchange={e => update('going', e.currentTarget)} /><span>mm</span></div>
             {#if dimensions.flightCount > 1}<label for="landing-length">Bordeslengte</label><div class="numeric-input"><input id="landing-length" type="number" min="300" max="5000" step="10" value={model.stair.landingLength} onchange={e => update('landingLength', e.currentTarget)} /><span>mm</span></div>
               <label for="landing-thickness">Bordesdikte</label><div class="numeric-input"><input id="landing-thickness" type="number" min="20" max="300" step="5" value={model.stair.landingThickness} onchange={e => update('landingThickness',e.currentTarget)} /><span>mm</span></div>
               {#if timberSystem}
@@ -784,7 +795,7 @@
               </select>
               {#if model.stair.type!=='landing'}<label for="turn-direction-landing">Draairichting bij oplopen</label><select id="turn-direction-landing" value={model.stair.turnDirection} onchange={e=>update('turnDirection',e.currentTarget.value)}><option value="left">Linksom</option><option value="right">Rechtsom</option></select>{/if}
             {/if}
-            <div class="computed-row"><span>Ontwikkelde looplengte</span><b>{dimensions.totalRun} mm</b></div><div class="computed-row"><span>Hellingshoek</span><b>{dimensions.pitch.toFixed(1)}°</b></div>
+            <div class="computed-row"><span>Ontwikkelde looplengte</span><b>{dimensions.totalRun.toLocaleString('nl-NL',{maximumFractionDigits:1})} mm</b></div><div class="computed-row"><span>{dimensions.dimensioned ? 'Gemiddelde hellingshoek' : 'Hellingshoek'}</span><b>{dimensions.pitch.toFixed(1)}°</b></div>
           </div>
           <div class="property-section"><h3>Constructie <span>⌃</span></h3>
             {#if timberSystem}

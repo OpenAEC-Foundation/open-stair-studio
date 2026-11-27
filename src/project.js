@@ -1,8 +1,9 @@
-import { ruleProfiles, stairFamilies, starterProject } from './stair.js';
+import { generateStairGeometry, ruleProfiles, stairFamilies, starterProject } from './stair.js';
 import { isWinder } from './winder.js';
 import { readWell } from './stairwell.js';
 import { ifcModelId } from './ifc-identity.js';
 import {timberDimensions, timberStyles, noseNames} from './timber-settings.js';
+import {devriesTwoQuarterSettings, equalQuarterAngles, quarterAngleError} from './two-quarter-settings.js';
 import { validateCamField } from './housing-cam.js';
 import { validateTreadCamField } from './tread-cam.js';
 import { validateRiserCamField } from './riser-board-settings.js';
@@ -20,6 +21,7 @@ const ranges = {
   originX: [-1000000000, 1000000000], originY: [-1000000000, 1000000000], originZ: [-1000000000, 1000000000],
   originRotationDeg: [-360, 360],
   windersPerQuarter: [2, 8], middleSteps: [1, 35], entrySteps: [-1, 39],
+  outerLength: [1, 30000], outerDepth: [1, 30000], middleOffset: [-15000,15000],
   landingLength: [300, 5000], landingRiser: [0, 39], landingThickness: [20, 300], stringerThickness: [20, 150], stringerDepth: [100, 1000], stringerOverhang:[-60,60],
   landingFrameWidth: [40, 150], landingFrameDepth: [80, 300],
   landingScrewsPerJoint: [0, 4], landingScrewDiameter: [5, 12], landingScrewLength: [40, 250],
@@ -34,6 +36,7 @@ const labels = {
   originX: 'Projectnulpunt X', originY: 'Projectnulpunt Y', originZ: 'Projectnulpunt Z',
   originRotationDeg: 'Rotatie projectassen',
   windersPerQuarter: 'Treden per kwartslag', middleSteps: 'Rechte treden tussen de kwarten', entrySteps: 'Treden vóór de boog',
+  outerLength: 'Buitenlengte', outerDepth: 'Buitendiepte', middleOffset: 'Verschuiving tussenstuk',
   landingLength: 'Bordeslengte', landingRiser:'Optrede op bordes', landingThickness: 'Bordesdikte', stringerThickness: 'Wangdikte', stringerDepth: 'Wanghoogte', stringerOverhang:'Trederand t.o.v. keepboom',
   landingFrameWidth: 'Bordesliggerbreedte', landingFrameDepth: 'Bordesliggerhoogte',
   landingScrewsPerJoint: 'Schroeven per stuiknaad', landingScrewDiameter: 'Schroefdiameter', landingScrewLength: 'Schroeflengte',
@@ -50,6 +53,13 @@ const isRecord = value => value !== null && typeof value === 'object' && !Array.
 
 function readField(section, key, value) {
   const prototype = starterProject[section][key];
+  if (section === 'stair' && (key === 'firstQuarterAngles' || key === 'secondQuarterAngles')) {
+    const issue = quarterAngleError(value);
+    if (issue) throw new Error(issue);
+    return [...value];
+  }
+  if (section === 'stair' && key === 'twoQuarterLayout' && !['automatic','dimensioned'].includes(value))
+    throw new Error('Kies een ontwerp op klimlijn of op buitenmaten.');
   if (key === 'profile' && !ruleProfiles.some(profile => profile.id === value)) throw new Error('Onbekend regelprofiel.');
   if (section === 'cam') return validateCamField(key, value);
   if (section === 'treadCam') return validateTreadCamField(key, value);
@@ -76,7 +86,7 @@ function readField(section, key, value) {
     if (typeof value !== typeof prototype) throw new Error(`Ongeldige waarde voor ${section}.${key}.`);
     return value;
   }
-  if (value === null && (section === 'building' || key === 'headroom' || (section === 'stair' && key === 'wel'))) return null;
+  if (value === null && (section === 'building' || key === 'headroom' || (section === 'stair' && ['wel','outerLength','outerDepth'].includes(key)))) return null;
   const label = labels[key] ?? key;
   const integer = ['risers', 'windersPerQuarter', 'middleSteps', 'entrySteps', 'landingRiser', 'landingScrewsPerJoint'].includes(key);
   if (!Number.isFinite(value) || (integer && !Number.isInteger(value))) {
@@ -152,7 +162,7 @@ export function readProject(raw) {
 
 export function parseInput(section, key, raw) {
   const kind = typeof starterProject[section][key];
-  const value = kind === 'string' || kind === 'boolean' ? raw : raw === '' ? null : Number(raw);
+  const value = kind === 'string' || kind === 'boolean' || Array.isArray(starterProject[section][key]) ? raw : raw === '' ? null : Number(raw);
   return readField(section, key, value);
 }
 
@@ -164,6 +174,15 @@ export function editSession(session, section, key, value) {
   if (Object.is(session.model[section][key], value) && !(section === 'stair' && key === 'type' && !session.model.stairEnabled)) return session;
   const model = { ...session.model, [section]: { ...session.model[section], [key]: value } };
   if (section === 'stair' && key === 'type') model.stairEnabled = true;
+  if (section === 'stair' && key === 'twoQuarterLayout' && value === 'dimensioned' &&
+      model.stair.outerLength == null && model.stair.outerDepth == null) {
+    const stair = model.stair;
+    const {footprint} = generateStairGeometry(session.model.stair, {projectIsometric:false});
+    stair.outerLength = Math.ceil(footprint.depth || 2*stair.width + (stair.middleSteps+1)*stair.going);
+    stair.outerDepth = Math.ceil(footprint.width || stair.width + (2+Math.max(0,stair.entrySteps))*stair.going);
+    stair.firstQuarterAngles = equalQuarterAngles(stair.windersPerQuarter);
+    stair.secondQuarterAngles = [...stair.firstQuarterAngles];
+  }
   if (section === 'stair' && key === 'type' && isWinder(value)) {
     model.stair.stringerLeft = 'housed';
     model.stair.stringerRight = 'housed';
@@ -172,7 +191,7 @@ export function editSession(session, section, key, value) {
   if(section==='stair'&&key==='riserPosition'&&value==='manual') model.stair.riserJoint='butt';
   // Surveyed widths refer to a particular stair layout. Undo restores both
   // the geometry and the measurements for that layout together.
-  if (section === 'stair' && ['width', 'stringerThickness', 'stringerLeft','stringerRight','stringerOverhang','type', 'turnDirection', 'outerShape', 'laneGap', 'going', 'risers', 'windersPerQuarter', 'middleSteps', 'entrySteps', 'nosing', 'wel', 'landingLength','landingRiser'].includes(key)) {
+  if (section === 'stair' && ['width', 'stringerThickness', 'stringerLeft','stringerRight','stringerOverhang','type', 'turnDirection', 'outerShape', 'twoQuarterLayout', 'outerLength', 'outerDepth', 'middleOffset', 'firstQuarterAngles', 'secondQuarterAngles', 'laneGap', 'going', 'risers', 'windersPerQuarter', 'middleSteps', 'entrySteps', 'nosing', 'wel', 'landingLength','landingRiser'].includes(key)) {
     model.engineering = { ...model.engineering, escapeWinderWidth: null };
     if (['type', 'width', 'stringerThickness'].includes(key)) model.engineering.escapeWidth = null;
   }
@@ -184,6 +203,14 @@ export function editSession(session, section, key, value) {
     model.engineeringVariants = variants;
   }
   return { ...session, model, history: [...session.history.slice(-49), session.model], future: [] };
+}
+
+export function applyTwoQuarterReference(session) {
+  const model = {...session.model, stairEnabled: true,
+    stair: {...session.model.stair, ...structuredClone(devriesTwoQuarterSettings)},
+    joinery: {...session.model.joinery, type: 'none'},
+    engineering: {...session.model.engineering, escapeWidth: null, escapeWinderWidth: null}};
+  return {...session, model, history: [...session.history.slice(-49), session.model], future: []};
 }
 
 export function editWell(session, raw) {

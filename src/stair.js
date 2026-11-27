@@ -2,6 +2,7 @@ import { geometryErrors } from './stair-validity.js';
 import { emptyWell } from './stairwell.js';
 import { detailDefaults } from './stair-details.js';
 import { timberDefaults } from './timber-settings.js';
+import { twoQuarterDefaults } from './two-quarter-settings.js';
 import { housedRisers, legacyFrontLip, riserPlaneOffset } from './timber-riser.js';
 import { buildStairViews } from './stair-views.js';
 import { buildLandingFrame } from './landing-frame.js';
@@ -36,7 +37,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.22',
+  version: '0.13.23',
   stairEnabled: true,
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
@@ -53,6 +54,7 @@ export const starterProject = {
   stair: {
     ...detailDefaults,
     ...timberDefaults,
+    ...twoQuarterDefaults,
     riserJoint: 'butt', riserGrooveDepth: 8,
     mark: 'TR-01', name: 'Hoofdtrap', type: 'straight', material: 'Eiken · massief',
     materialName:'', materialFeature:'', materialApplication:'', nlsfbCode:'', nlsfbLandingCode:'', nlsfbRailingCode:'',
@@ -426,8 +428,7 @@ export function inspectStair(model, geometry) {
   return findings;
 }
 
-export function elevationPath(stair, width = 820, height = 520) {
-  const d = deriveStair(stair);
+export function elevationPath(stair, width = 820, height = 520, d = deriveStair(stair)) {
   const pad = { left: 105, right: 132, top: 105, bottom: 110 };
   const sx = (width - pad.left - pad.right) / Math.max(d.totalRun, 1);
   const sy = (height - pad.top - pad.bottom) / Math.max(Number(stair.floorHeight), 1);
@@ -438,10 +439,11 @@ export function elevationPath(stair, width = 820, height = 520) {
   let station = 0;
   for (const flight of d.flights) {
     for (let i = 0; i < flight.risers; i++) {
-      const x = ox + (station + i * Number(stair.going)) * sx;
+      const treadStation = d.walklineStations?.[i] ?? (station + i * Number(stair.going));
+      const x = ox + treadStation * sx;
       const y = oy - (riseIndex + 1) * d.rise * sy;
       pts.push(`L ${x} ${y}`);
-      if (i < flight.treadCount) pts.push(`L ${x + Number(stair.going) * sx} ${y}`);
+      if (i < flight.treadCount) pts.push(`L ${ox + (d.walklineStations?.[i+1] ?? treadStation + Number(stair.going)) * sx} ${y}`);
       riseIndex++;
     }
     station += flight.treadCount * Number(stair.going);

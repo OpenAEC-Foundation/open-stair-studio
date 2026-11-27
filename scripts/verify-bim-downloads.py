@@ -113,6 +113,42 @@ def check(page, download):
         assert design['DesignedNosingProjection_mm'] == 45
         assert (design['MiddleStraightTreads'], design['TurnDirection'], design['TreadPositionAlongWalkingLine_mm']) == (5, hand, position)
 
+    page.get_by_role('button', name='De Vries-voorbeeld toepassen', exact=False).click()
+    assert page.locator('#two-quarter-layout').input_value() == 'dimensioned'
+    assert float(page.locator('#middle-offset').input_value()) == 20.034
+    assert page.locator('#turn-direction').input_value() == 'right'
+    for hand, size in [('left', (3140, 992)), ('right', (3300, 1100))]:
+        mark = 'MAAT-' + hand.upper()
+        page.locator('#turn-direction').select_option(hand)
+        page.locator('#stair-mark').fill(mark)
+        set_mm('#outer-length', size[0])
+        set_mm('#outer-depth', size[1])
+        if hand == 'right':
+            for index, angle in enumerate([15, 17, 19, 20]):
+                set_mm('#upper-quarter-' + str(index), angle)
+        project_path = download('Opslaan', '.oss.json')
+        settings = json.loads(project_path.read_text(encoding='utf-8'))['stair']
+        assert settings['firstQuarterAngles'][0] == 18.533
+        if hand == 'right':
+            assert settings['secondQuarterAngles'] == [15, 17, 19, 20, 19]
+        project_file.set_input_files(project_path)
+        page.get_by_text(f'{mark} · Dichte steektrap', exact=True).first.wait_for()
+        bim.click()
+        step_path = download(panel.get_by_role('button', name='IFC4 exporteren'), '.ifc')
+        layer_path = download(panel.get_by_role('button', name='IFCX alpha exporteren'), '.ifcx')
+        model = verify_download_pair(step_path, layer_path, {mark})
+        props = element.get_pset(model.by_type('IfcStair')[0], 'Pset_OpenStairStudio_Design')
+        assert props['TwoQuarterLayout'] == 'dimensioned' and 'WindersPerQuarter' not in props
+        assert props['MiddleStraightOffset_mm'] == 20.034
+        assert (props['DesignOuterLength_mm'], props['DesignOuterDepth_mm']) == size
+        for prefix, angles in [('Lower', settings['firstQuarterAngles']), ('Upper', settings['secondQuarterAngles'])]:
+            assert props[prefix + 'QuarterWinders'] == len(angles)
+            values = [props[f'{prefix}QuarterAngle{i+1:02}'] for i in range(len(angles))]
+            np.testing.assert_allclose(np.degrees(values), angles)
+        meshes = [n['attributes']['usd::usdgeom::mesh']['points'] for n in json.loads(layer_path.read_text(encoding='utf-8'))['data']
+                  if 'usd::usdgeom::mesh' in n['attributes']]
+        np.testing.assert_allclose(sorted(np.ptp(np.vstack(meshes), axis=0)[:2] * 1000, reverse=True), size, atol=.02, rtol=0)
+
     config = json.loads((EXAMPLES / 'zes-trapontwerpen.oss.json').read_text(encoding='utf-8'))
     items = [i for i in config['stairwell']['instances'] if i['type'] in ('portable', 'ladder')]
     assert len(items) == 2

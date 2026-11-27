@@ -2,6 +2,12 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.23
+
+- Bij de tweekwartstrap kun je de buitenlengte en buitendiepte vastleggen en het rechte tussenstuk langs de trap verschuiven. Het onderkwart en het bovenkwart hebben elk een eigen aantal treden en draaihoek per trede.
+- Met **De Vries-voorbeeld toepassen** teken je de gesloten tweekwart op 3140 × 992 mm met 45 mm wel. De draairichting blijft instelbaar. Het voorbeeld bevat vijf verdreven, vijf rechte en vijf verdreven treden.
+- De werkbladen, CNC-tredecontouren, IFC4 en IFCX alpha volgen de ingestelde verdeling. [Verschillen met het fabrikantmodel](https://github.com/OpenAEC-Foundation/open-stair-studio/blob/v0.13.23/docs/bim-referentietrappen.md) · [Voorbeelden linksom en rechtsom](https://github.com/OpenAEC-Foundation/open-stair-studio/raw/refs/tags/v0.13.23/examples/tweekwart-3140x992.zip)
+
 ## Nieuw in 0.13.22
 
 - Stel bij een houten trap de wel in millimeters in. Verplaats de hele trede langs de looplijn met de afzonderlijke maat **Tredepositie**. De stootborden, groeven en werkstukken volgen de gekozen aansluiting.

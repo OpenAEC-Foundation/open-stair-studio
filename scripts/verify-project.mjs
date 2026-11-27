@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { calculateEstimate, starterProject } from '../src/stair.js';
-import { draftKey, editSession, isDirty, parseInput, readProject, redoSession, restoreDraft, saveDraft, startSession, undoSession } from '../src/project.js';
+import { applyTwoQuarterReference, draftKey, editSession, isDirty, parseInput, readProject, redoSession, restoreDraft, saveDraft, startSession, undoSession } from '../src/project.js';
 
 const project = structuredClone(starterProject);
 project.project.name = 'Renovatie ƒ · test';
@@ -38,6 +38,24 @@ assert.deepEqual(readProject(JSON.parse(JSON.stringify(resized.model))), resized
 assert.equal(undoSession(shifted).model.stair.wel, 45);
 assert.equal(undoSession(shifted).model.stair.nosing, migrated.stair.nosing);
 assert.equal(parseInput('stair', 'wel', '0'), 0);
+const original = startSession({...project, stair:{...project.stair,turnDirection:'right'}});
+const reference = applyTwoQuarterReference(original);
+assert.equal(reference.model.stair.turnDirection,'right');
+assert.equal(reference.model.stair.mark,project.stair.mark);
+assert.equal(reference.model.joinery.type,'none');
+assert.equal(reference.model.stair.middleOffset,20.034);
+assert.deepEqual(undoSession(reference).model, original.model);
+assert.deepEqual(redoSession(undoSession(reference)).model, reference.model);
+assert.deepEqual(readProject(reference.model), reference.model);
+const editedAngles = parseInput('stair','secondQuarterAngles',[20,30,40]);
+const changedUpper = editSession(reference,'stair','secondQuarterAngles',editedAngles);
+assert.deepEqual(changedUpper.model.stair.firstQuarterAngles,reference.model.stair.firstQuarterAngles);
+assert.deepEqual(readProject(changedUpper.model).stair.secondQuarterAngles,editedAngles);
+for (const values of [[18,18,18,18], [0,30,60], '10 40 40', [90], [NaN,45], [10,'20',60]])
+  assert.throws(() => parseInput('stair','firstQuarterAngles',values));
+const oldWinder = structuredClone(reference.model);
+for (const key of ['twoQuarterLayout','outerLength','outerDepth','firstQuarterAngles','secondQuarterAngles']) delete oldWinder.stair[key];
+assert.equal(readProject(oldWinder).stair.twoQuarterLayout,'automatic');
 assert.throws(() => parseInput('stair', 'wel', '-1'));
 assert.throws(() => parseInput('stair', 'middleSteps', '1.5'));
 const archivedClosed = structuredClone(archive);

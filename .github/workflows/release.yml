@@ -56,6 +56,11 @@ jobs:
           node scripts/export-wel-tweekwart.mjs $comparison --bordessen
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/verify-wel-landing.py $comparison
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $compact = Join-Path $env:RUNNER_TEMP 'tweekwart-buitenmaten'
+          node scripts/export-compact-tweekwart.mjs $compact --varianten
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/measure-compact-tweekwart.py $compact --express
         shell: pwsh
       - name: Build signed Windows installer and updater artifact
         env:

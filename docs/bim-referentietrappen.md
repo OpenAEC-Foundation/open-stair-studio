@@ -44,7 +44,7 @@ Het [vergelijkingsproject](../examples/bim-steektrap-vergelijking.oss.json) is v
 
 **Linksom en rechtsom.** Na spiegelen over het XZ-vlak zijn alle unieke meshpunten uit de eigen IFC-bestanden vergeleken op een afronding van 0,0001 mm. Bij de kwartslag kwamen alle 254 punten overeen en bij de halfslag alle 290. De fabrikantvergelijking gebruikt de beschikbare linker modellen.
 
-## Onafhankelijke wel en tweekwart met rechte tussenloop
+## Onafhankelijke wel en tweekwart met automatisch berekende buitenmaten
 
 Bij de gesloten tweekwart van De Vries zijn de zestien stootborden op hoogte gesorteerd. Hun voorvlakken draaien achtereenvolgens 18,53°, 18,81°, 17,92°, 18,04° en 16,70°, blijven vijf intervallen evenwijdig en draaien vervolgens 17,64°, 17,75°, 16,95°, 18,73° en 18,94°. Elk kwart draait in totaal 90°. Alle vijftien volle treden hebben 45,00 mm wel en de vijf rechte bladen meten tussen hun lange evenwijdige zijden 265,512 tot 265,513 mm. Bij de rechte referentietrap zijn die bladen 265,00 mm diep. [Gesloten tweekwart van De Vries](https://www.devriestrappen.nl/friksbeheer/wp-content/uploads/2019/09/Tweekwart-Dicht-3160x1000-IFC.zip) · [Gesloten steektrap van De Vries](https://www.devriestrappen.nl/friksbeheer/wp-content/uploads/2019/09/Steektrap-dicht-3300x900-IFC.zip)
 
@@ -73,6 +73,44 @@ De exportproef gebruikt zestien optredes, een wel van 45 mm en tredeposities −
 ```powershell
 node scripts/export-wel-tweekwart.mjs "$env:TEMP/oss-wel-vergelijking"
 uv run --no-project --python 3.12 --with ifcopenshell==0.9.0.post1 python scripts/measure-wel-tweekwart.py --verify-exports "$env:TEMP/oss-wel-vergelijking" "C:\BIM\Steektrap_Dicht (3300x900)-L.IFC" "C:\BIM\Boven_- onderkwart_Dicht (3160x1000)-L.IFC"
+```
+
+## Maatvaste gesloten tweekwart
+
+De referentie meet in wereldcoördinaten van X = 10 tot 3150 mm en Y = 7,895 tot 1000 mm. De twee spillen hebben elk een doorsnede van 114 × 66 mm. De onderste staat op X = 2122–2236 mm en de bovenste op X = 924–1038 mm, beide op Y = 20–86 mm. De binnenwang van de tussenloop loopt van X = 1038 tot 2122 mm en van Y = 34 tot 72 mm. De buitenwang ligt op Y = 962–1000 mm. De fabrikant levert de linkse uitvoering. [Gesloten tweekwart van De Vries](https://www.devriestrappen.nl/friksbeheer/wp-content/uploads/2019/09/Tweekwart-Dicht-3160x1000-IFC.zip)
+
+| Meting aan de geëxporteerde onderdelen | Studio, links en rechts, IFC4 en IFCX | De Vries, links, IFC2x3 |
+| --- | ---: | ---: |
+| Buitenmaat inclusief wangen, lang × diep | 3140,000 × 992,000 mm | 3140,000 × 992,105 mm |
+| Hoogte inclusief alle onderdelen | 2900 mm | 3950 mm |
+| Wel op elk van de vijftien volle treden | 45,000 mm | 45,000 mm |
+| Vijf rechte aantreden | 220,513 mm | 220,512–220,513 mm |
+| Bladdiepte van de vijf rechte treden | 265,513 mm | 265,512–265,513 mm |
+| Onderkwart, hoekstappen in graden | 18,533 / 18,809 / 17,920 / 18,040 / 16,698 | 18,533 / 18,809 / 17,920 / 18,040 / 16,698 |
+| Bovenkwart, hoekstappen in graden | 17,639 / 17,746 / 16,945 / 18,731 / 18,939 | 17,639 / 17,746 / 16,945 / 18,731 / 18,938 |
+| Zichtvlak stootbord 7 vanaf de linker buitenkant in de figuur | 1880,7355 mm | 1880,7350 mm |
+
+![Linkse maatvaste tweekwart en fabrikantmodel op gelijke schaal. Wangen en spillen zijn blauwgrijs. De vijf rechte treden liggen vrijwel op elkaar bij uitlijning.](vergelijking-tweekwart-maatvast.png)
+
+De figuur lijnt de eerste stijgrichting en de buitenste hoek van de omhulling uit. Met een verschuiving van +20,034 mm langs de tussenloop valt het zevende stootbord op 0,0005 mm van het referentievlak. Het bronmodel heeft twee afzonderlijke spillen, aansluitende sparingen in de bladen en een vloerlijst. De bovenste spil steekt 1050 mm boven de verdieping uit. Studio modelleert de aansluiting met gesegmenteerde wangen. [Projecten en BIM-exports voor links en rechts](../examples/tweekwart-3140x992.zip)
+
+Voor de vergelijking van de bladcontouren meet de proef voor elk hoekpunt de afstand tot de andere bladrand, in beide richtingen. Onderstaande getallen geven per trede de grootste gemeten afstand in de uitgelijnde plattegrond.
+
+| Groep | Treden in stijgrichting | Grootste contourafstand per blad (mm) |
+| --- | --- | --- |
+| Onderkwart | 1–5 | 24,41 · 26,30 · 23,32 · 24,26 · 15,54 |
+| Rechte tussenloop | 6–10 | 14,11 · 0,11 · 0,11 · 0,11 · 14,11 |
+| Bovenkwart | 11–15 | 14,11 · 15,81 · 19,04 · 42,71 · 48,89 |
+
+De maatproef leest vijf instellingen terug, elk in beide draairichtingen en beide bestandsformaten. In de variant van 3300 × 1100 mm krijgt het bovenkwart de hoeken 15°, 17°, 19°, 20° en 19°. In de tweede hoekvariant op 3140 × 992 mm veranderen alleen de hoeken van het onderkwart in 17°, 18°, 19°, 20° en 16°. Bij de tredeposities −15, 0 en +15 mm ligt het midden van het eerste stootbord op respectievelijk X = 66,5, 51,5 en 36,5 mm in de Studio-export. Alle drie behouden de buitenmaat van 3140 × 992 mm. Alle 300 welmetingen aan de twintig bestanden geven 45,000 mm. [Meetscript](../scripts/measure-compact-tweekwart.py)
+
+De linkse en rechtse referentie-export bevatten elk 15 bladen, 16 stootborden en 30 wangdelen. De spiegelproef vergelijkt de 3D-hoekpunten, het oppervlak en het volume per onderdeel. Voor alle vijf instellingen kwamen de hoekpunten na spiegeling binnen 0,000001 mm overeen in elk formaat. Tussen IFC4 en IFCX bedroeg het grootste hoekpuntverschil minder dan 0,000033 mm. IfcOpenShell 0.9.0.post1 valideerde de tien IFC4-bestanden inclusief EXPRESS-regels zonder meldingen. [Validatie en meettoleranties](../scripts/measure-compact-tweekwart.py)
+
+Gebruik voor de fabrikantvergelijking het uitgepakte IFC-bestand uit de gelinkte ZIP. Zonder `--reference` en `--figure` controleert dezelfde opdracht alle twintig eigen exports.
+
+```powershell
+node scripts/export-compact-tweekwart.mjs "$env:TEMP/oss-compact-tweekwart" --varianten
+uv run --no-project --python 3.12 --with ifcopenshell==0.9.0.post1 --with pytest --with matplotlib python scripts/measure-compact-tweekwart.py "$env:TEMP/oss-compact-tweekwart" --express --reference "C:\BIM\Boven_- onderkwart_Dicht (3160x1000)-L.IFC" --figure docs/vergelijking-tweekwart-maatvast.png
 ```
 
 ## Onafhankelijke gebouwmodellen
