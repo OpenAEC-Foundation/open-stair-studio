@@ -2,6 +2,13 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.24
+
+- Bij een houten tweekwartstrap met vaste buitenmaten kun je de onder- en bovenspil afzonderlijk plaatsen. Stel de doorsnede, positie, hoogte, smalle aantrede en insteekdiepte per spil in. Het De Vries-voorbeeld gebruikt een stuikende aansluiting.
+- Kies de ontwerpmaat van 3140 × 992 mm of de gemeten IFC-maat van 3140 × 992,105 mm om de zaagcontour van trede 15 met het fabrikantmodel te vergelijken.
+- Het tredeblad, de CNC-contour van trede 15 en de beide BIM-formaten volgen de gekozen aansluiting. IFC4 en IFCX alpha bevatten de houten spillen, hun verbindingen met de treden en de ingestelde huizen. [Meetrapport](https://github.com/OpenAEC-Foundation/open-stair-studio/blob/v0.13.24/docs/spillen-tweekwart.md) · [Voorbeeldprojecten en freesbestanden](https://github.com/OpenAEC-Foundation/open-stair-studio/raw/refs/tags/v0.13.24/examples/tweekwart-spillen.zip)
+- Op het spilblad staan de DXF en de LinuxCNC-programma's per opspanvlak. Bij insteek geeft het blad aan welke binnenhoeken of schuine ruggen na het voorfrezen moeten worden nagestoken.
+
 ## Nieuw in 0.13.23
 
 - Bij de tweekwartstrap kun je de buitenlengte en buitendiepte vastleggen en het rechte tussenstuk langs de trap verschuiven. Het onderkwart en het bovenkwart hebben elk een eigen aantal treden en draaihoek per trede.

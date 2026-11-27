@@ -1,11 +1,14 @@
 <script>
   import QuarterAngles from './QuarterAngles.svelte';
+  import NewelControls from './NewelControls.svelte';
   export let stair;
   export let geometry;
   export let details;
   export let update;
   export let showPlan;
   export let applyReference;
+  export let timber = true;
+  let referenceSize = 'nominal';
   $: twoQuarter = stair.type === 'two_quarter_winder';
   $: dimensioned = twoQuarter && stair.twoQuarterLayout === 'dimensioned';
   $: quarters = twoQuarter || stair.type === 'half_winder' ? 2 : 1;
@@ -37,7 +40,14 @@
     <select id="two-quarter-layout" value={stair.twoQuarterLayout} onchange={e=>update('twoQuarterLayout', e.currentTarget.value)}>
       <option value="automatic">Afgeleid van de klimlijn</option><option value="dimensioned">Vaste buitenmaten</option>
     </select>
-    <button class="action-btn" title="Past 16 optredes, 45 mm wel en stuikende stootborden toe. Wanghuizen kun je op het werkblad toevoegen." onclick={applyReference}>De Vries-voorbeeld toepassen · 3140 × 992 mm</button>
+    {#if timber}
+      <label for="reference-size">Buitenmaat De Vries-voorbeeld</label>
+      <select id="reference-size" bind:value={referenceSize}>
+        <option value="nominal">3140 × 992 mm · ontwerpmaat</option>
+        <option value="ifc">3140 × 992,105 mm · gemeten IFC-maat</option>
+      </select>
+      <button class="action-btn" title="Past 16 optredes, 45 mm wel en twee spillen met stuikende tredeaansluitingen toe." onclick={()=>applyReference(referenceSize)}>De Vries-voorbeeld toepassen</button>
+    {/if}
   {/if}
   {#if dimensioned}
     <small>De buitenmaten lopen over de treden, stootborden en wangen.</small>
@@ -82,6 +92,7 @@
     <div class="computed-row"><span>Kleinste aantrede op klimlijn</span><b>{Math.min(...geometry.treads.map(t => t.goingAtWalkline)).toLocaleString('nl-NL', {maximumFractionDigits:1})} mm</b></div>
   {/if}
 </section>
+{#if dimensioned && timber}<NewelControls {stair} {update}/>{/if}
 <style>
   .winder-controls h3 button { font-weight: 500; color: var(--oa-accent-text); }
   .winder-controls h3 { display: flex; align-items: center; justify-content: space-between; }

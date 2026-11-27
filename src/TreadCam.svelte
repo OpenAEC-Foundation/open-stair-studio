@@ -168,11 +168,14 @@
   {/if}
 
   <section class="fit-result" class:blocked={fit?.status === 'blocked' || result.problem} aria-live="polite">
-    <h2>Passing in de wanghuizen</h2>
+    <h2>{part.newelJoints?.length?'Passing van de tredeaansluitingen':'Passing in de wanghuizen'}</h2>
     {#if result.problem}<p role="status">{result.problem}</p>
     {:else if fit}
       <p>{fit.status === 'blocked' ? 'Freesuitvoer geblokkeerd. Pas de onderstaande verbinding of instelling aan.' : fit.message}</p>
       {#if setupIssues.length}<ul>{#each setupIssues as issue}<li>{issue}</li>{/each}</ul>{/if}
+      {#each fit.newels??[] as joint}
+        <p><b>{joint.postId}</b> · {joint.requiresFinishing?'Hoogtespeling per rand '+mm(joint.edgeClearance)+' mm. Steek het voorgefreesde spilhuis na volgens het spilblad.':'Stuikend tegen de spil.'}</p>
+      {/each}
       {#if fit.connections?.length}
         <table class="connections">
           <thead><tr><th>Insteeklip / wang</th><th>Speling per rand¹</th><th>Ruimte achter lip</th><th>Passing</th></tr></thead>

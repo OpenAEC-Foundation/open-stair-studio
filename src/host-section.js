@@ -70,9 +70,9 @@ export function sectionArea(triangles,z,transform=p=>p) {
 
 export function stairBodyTriangles(geometry) {
   const groups=[];
-  for(const field of ['treads','landings','stringers','componentParts']){
+  for(const field of ['treads','landings','stringers','newels','componentParts']){
     for(const part of geometry[field]??[]){
-      const body={...geometry,treads:[],landings:[],stringers:[],componentParts:[],[field]:[part]};
+      const body={...geometry,treads:[],landings:[],stringers:[],newels:[],componentParts:[],[field]:[part]};
       groups.push(viewportTriangles(body));
     }
   }

@@ -1,10 +1,11 @@
 import Drawing from 'dxf-writer';
 import { individualTreads } from './workshop.js';
+import { newelFaceSetups } from './newel-cam.js';
 
 const mmFormat = new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 2, useGrouping: false });
 export const mm = value => Number.isFinite(value) ? mmFormat.format(value) : '—';
 export const stockText = sizes => sizes.map(mm).join(' × ');
-export const groupNames = { tread: 'Treden', riser: 'Stootborden', nosingStrip: 'Wellatten', newel: 'Trappalen', baluster: 'Spijlen', handrail: 'Leuningdelen' };
+export const groupNames = { tread: 'Treden', riser: 'Stootborden', nosingStrip: 'Wellatten', quarterNewel: 'Spillen', newel: 'Trappalen', baluster: 'Spijlen', handrail: 'Leuningdelen' };
 const profileNames = { square: 'Haakse neus', round: 'Afgeronde bovenneus', bevel: 'Afgeschuinde bovenneus' };
 
 export function timberSheetParts(geometry, details) {
@@ -17,7 +18,12 @@ export function timberSheetParts(geometry, details) {
     stock: [p.stockLengthMm, p.stockWidthMm, p.stockThicknessMm],
     netVolume: p.volumeM3, length: p.lengthMm, part: p
   }));
-  return [...treads, ...railing];
+  const posts=(geometry.newels??[]).map(p=>({
+    id:p.id,type:'quarterNewel',name:p.corner==='lower'?'Onderspil':'Bovenspil',
+    profile:'Rechthoekige spil',stock:[p.height,p.length,p.width],
+    netVolume:p.volume,length:p.upperZ-p.lowerZ,part:p
+  }));
+  return [...treads, ...posts, ...railing];
 }
 
 const point = (x, y) => ({ x, y });
@@ -138,6 +144,17 @@ function winderRiserViews(p) {
 
 export function timberViews(row, stationIndex = 0) {
   if (row.type === 'tread') return treadViews(row.part);
+  if (row.type === 'quarterNewel') {
+    const post=row.part;
+    const rect=(x0,y0,x1,y1,mode)=>line([point(x0,y0),point(x1,y0),point(x1,y1),point(x0,y1)],mode);
+    const faces=newelFaceSetups(post).map(face=>diagram(post.id+' · vlak '+face.label,[
+      rect(0,0,face.length,face.width,'wood'),...face.pockets.flatMap(p=>p.strips.map(s=>rect(p.lower,s.from,p.upper,s.to,'joint')))
+    ],'X vanaf de spilvoet. Dwarsrichting in het model ('+face.yAxis.x+', '+face.yAxis.y+').'));
+    const dx=post.xMax-post.xMin,dy=post.yMax-post.yMin;
+    return [...faces,...post.pockets.map(p=>diagram(post.id+' · huis '+p.treadId,[
+      rect(0,0,dx,dy,'wood'),line(p.points.map(v=>point(v.x-post.xMin,v.y-post.yMin)),'joint')
+    ],'Horizontale doorsnede van '+mm(p.lowerZ-post.lowerZ)+' tot '+mm(p.upperZ-post.lowerZ)+' mm vanaf de voet.'))];
+  }
   if (row.type === 'handrail') return railViews(row.part);
   if (row.type === 'riser' || row.type === 'nosingStrip') {
     if (row.type==='riser' && row.part.direction && row.part.planPoints && row.part.joineryFeatures?.length) return winderRiserViews(row.part);
@@ -185,7 +202,7 @@ export function layoutTimberView(view) {
 export function timberDetailDxf(row, views) {
   const drawing = new Drawing();
   drawing.setUnits('Millimeters');
-  const layers = { wood: 'OSS-OMTREK', joint: 'OSS-INSTEEKLIP', edge: 'OSS-REFERENTIE' };
+  const layers = { wood: 'OSS-OMTREK', joint: row.type==='quarterNewel'?'OSS-SPILHUIS':'OSS-INSTEEKLIP', edge: 'OSS-REFERENTIE' };
   for (const [name, color] of [[layers.wood, 7], [layers.joint, 3], [layers.edge, 5], ['OSS-PROFIEL', 2], ['OSS-MERK', 7]]) {
     drawing.addLayer(name, color, 'CONTINUOUS');
   }
@@ -193,7 +210,7 @@ export function timberDetailDxf(row, views) {
   views.forEach((view, i) => {
     const b = viewBounds(view), delta = i === 0 ? 0 : nextX - b.x0;
     for (const shape of view.paths) {
-      drawing.setActiveLayer(i === 1 ? 'OSS-PROFIEL' : layers[shape.mode]);
+      drawing.setActiveLayer(i === 1 && row.type!=='quarterNewel' ? 'OSS-PROFIEL' : layers[shape.mode]);
       // dxf-writer accepts an arc bulge on the starting vertex.
       const raw = shape.dxf ?? shape.points.map(p => [p.x, p.y]);
       drawing.drawPolyline(raw.map(([x, y, bulge]) => bulge ? [x + delta, y, bulge] : [x + delta, y]), shape.closed);

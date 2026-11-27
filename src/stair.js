@@ -2,7 +2,7 @@ import { geometryErrors } from './stair-validity.js';
 import { emptyWell } from './stairwell.js';
 import { detailDefaults } from './stair-details.js';
 import { timberDefaults } from './timber-settings.js';
-import { twoQuarterDefaults } from './two-quarter-settings.js';
+import { newelDefaults, twoQuarterDefaults } from './two-quarter-settings.js';
 import { housedRisers, legacyFrontLip, riserPlaneOffset } from './timber-riser.js';
 import { buildStairViews } from './stair-views.js';
 import { buildLandingFrame } from './landing-frame.js';
@@ -37,7 +37,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.23',
+  version: '0.13.24',
   stairEnabled: true,
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
@@ -55,6 +55,7 @@ export const starterProject = {
     ...detailDefaults,
     ...timberDefaults,
     ...twoQuarterDefaults,
+    ...newelDefaults,
     riserJoint: 'butt', riserGrooveDepth: 8,
     mark: 'TR-01', name: 'Hoofdtrap', type: 'straight', material: 'Eiken · massief',
     materialName:'', materialFeature:'', materialApplication:'', nlsfbCode:'', nlsfbLandingCode:'', nlsfbRailingCode:'',

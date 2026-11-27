@@ -5,6 +5,7 @@ import { housedRisers, legacyFrontLip, riserPlaneOffset } from './timber-riser.j
 import { signedMeshVolume } from './components/solids.js';
 import { dimensionedRoute, usesOuterDimensions } from './dimensioned-winder.js';
 import { quarterAngleError } from './two-quarter-settings.js';
+import { finishNewels, trimAtNewels } from './quarter-newels.js';
 
 const quarter = Math.PI / 2;
 const epsilon = 1e-7;
@@ -190,6 +191,7 @@ function interval(rail, first, last) {
 
 function makeCuts(stair, d) {
   const layout = d.dimensioned ? dimensionedRoute(stair,d) : makeRoute(stair,d);
+  if (layout.issue) return {issue:layout.issue};
   if (layout.invalid) return {issue:'Er is te weinig ruimte voor de kwarten tussen de rechte vluchten. Vergroot de buitenmaat of verklein de vluchtbreedte of het rechte tussenstuk.'};
   const { route, stations, sides, section } = layout;
   const housed = housedRisers(stair);
@@ -221,8 +223,17 @@ function makeCuts(stair, d) {
   for (let i = 0; i <= d.treadCount; i++) for (let side = 0; side < 2; side++) {
     const nose = noses[i].hits[side], face = faces[i].hits[side], back = boardBacks[i].hits[side];
     if (!nose || !fronts[i].hits[side] || !face || !back || nose.index > face.index + epsilon || back.index < face.index - epsilon) return null;
-    if (i && (nose.index<=noses[i-1].hits[side].index+epsilon ||
-        face.index<=boardBacks[i-1].hits[side].index+epsilon)) return null;
+    // At a post the cheek, not the scaffold inside its stock, is the
+    // physical tread boundary. The virtual stations can be very close.
+    const atPost=side===0 && route.posts?.some(post=>{
+      const low=Math.min(nose.point.y,back.point.y), high=Math.max(nose.point.y,back.point.y);
+      return low<=post.yMax+epsilon && high>=post.yMin-epsilon;
+    });
+    const noseInside=side===0 && i && route.posts?.some(post=>
+      [nose.point,noses[i-1].hits[side].point].every(p=>p.x>=post.xMin-epsilon && p.x<=post.xMax+epsilon &&
+        p.y>=post.yMin-epsilon && p.y<=post.yMax+epsilon));
+    if (i && ((!noseInside && nose.index<=noses[i-1].hits[side].index+epsilon) ||
+        (!atPost && face.index<=boardBacks[i-1].hits[side].index+epsilon))) return null;
     if (!d.dimensioned && stair.wel==null && i && nose.index<=seatEnds[i-1].hits[side].index+epsilon) return null;
   }
   const cuts = { route, sides, fronts, noses, faces, boardBacks, seatEnds, boards };
@@ -359,6 +370,10 @@ function railStock(rail, sideIndex, cuts, thickness) {
   const points = joints.map(j=>j.point);
   const outside = offsetJoints(points,sideIndex===0 ? 1 : -1,thickness);
   for (let j=1; j<joints.length; j++) {
+    // These portions of the construction rail are wholly replaced by the
+    // solid corner post. No stringer or mitre is sawn there.
+    if (sideIndex===0 && cuts.route.posts?.some(p=>
+      [points[j],points[j-1]].every(q=>q.y>=p.yMin-epsilon && q.y<=p.yMax+epsilon))) continue;
     if (!(dot(sub(points[j],points[j-1]),sub(outside[j],outside[j-1])) > epsilon)) return null;
   }
   if (!fitted) return {rail,hits,joints,outside};
@@ -401,7 +416,16 @@ function makeBeams(cuts, stair, rise, reflect) {
       return { ...reflect(joint.point), z: (i + 1 + fraction) * rise };
     });
     const side = (sideIndex === 0 ? 1 : -1) * (stair.turnDirection === 'right' ? -1 : 1);
-    const offset = outside.map((p,i)=>({...reflect(p),z:nodes[i].z}));
+    const offset = outside.map((p,i)=>{
+      const face=joints[i].point;
+      // The pitch changes inside a compact quarter. On the straight
+      // bearing rail each transverse joint is square in plan; a mitre
+      // extrapolated from the virtual taper would skew the divided ends.
+      const square=sideIndex===0 && cuts.route.posts?.some(post=>
+        Math.abs(post.innerX-face.x)<epsilon && Math.abs(face.x-p.x-stair.stringerThickness)<epsilon &&
+        Math.abs(face.y-(post.yMin+post.yMax)/2)<post.length+stair.going);
+      return {...reflect(square?{x:p.x,y:face.y}:p),z:nodes[i].z};
+    });
     let from=0, number=0;
     for (let j=1; j<nodes.length; j++) {
       if (cuts.route.dimensioned && j+1<nodes.length) {
@@ -410,11 +434,40 @@ function makeBeams(cuts, stair, rise, reflect) {
         const pitchChange=Math.abs((b.z-a.z)*mag(v)-(c.z-b.z)*mag(u));
         if (collinear && pitchChange < .0001*(mag(u)+mag(v))) continue;
       }
-      beams.push(beamBetween(nodes[from],nodes[j],offset[from],offset[j],side,stair,++number));
+      let span=[nodes[from],nodes[j],offset[from],offset[j]];
+      if (sideIndex===0 && cuts.route.posts?.length) span=spanToPost(span,cuts.route,reflect);
+      if (span) beams.push(beamBetween(...span,side,stair,++number));
       from=j;
     }
   }
   return beams;
+}
+
+// Trim both timber faces with the vertical cheek. The end is square in
+// plan, including where the virtual rail tapered inside the post.
+function spanToPost([a,b,c,d],route,reflect) {
+  const lower=route.posts.find(p=>p.corner==='lower'), upper=route.posts.find(p=>p.corner==='upper');
+  const A=reflect(a),B=reflect(b), horizontal=Math.abs(A.y-B.y)<epsilon;
+  let axis='y',low=lower?.yMax??-Infinity,high=upper?.yMin??Infinity;
+  if (horizontal) {
+    const end=route.posts.find(p=>Math.abs(A.y-(p.corner==='lower'?p.yMin:p.yMax))<epsilon);
+    if (end) {
+      if (!(end.corner==='lower'?route.entrySteps:route.exitSteps)) return null;
+      axis='x';low=-Infinity;high=end.xMin;
+    }
+  }
+  const trim=(start,finish)=>{
+    const first=reflect(start)[axis], last=reflect(finish)[axis], delta=last-first;
+    const point=t=>({...add(start,sub(finish,start),t),z:start.z+(finish.z-start.z)*t});
+    if (Math.abs(delta)<epsilon) return first<low-epsilon || first>high+epsilon ? null : [start,finish];
+    const near=(low-first)/delta, far=(high-first)/delta;
+    const t0=Math.max(0,Math.min(near,far)),t1=Math.min(1,Math.max(near,far));
+    return t1-t0<=epsilon ? null : [point(t0),point(t1)];
+  };
+  const inner=trim(a,b),outer=trim(c,d);
+  if (!inner || !outer) return null;
+  // Pitch is established on the inner bearing face of the member.
+  return [...inner,{...outer[0],z:inner[0].z},{...outer[1],z:inner[1].z}];
 }
 
 export function generateWinderGeometry(stair, family, options) {
@@ -425,13 +478,14 @@ export function generateWinderGeometry(stair, family, options) {
   const cuts = candidate?.issue ? null : candidate;
   const reflect = ({ x, y }) => ({ x, y: stair.turnDirection === 'right' ? -y : y });
   const treads = [], landings = [], walkline = [];
+  const posts=cuts?.route.posts??[];
   if (cuts) {
     for (let i = 0; i < treadCount; i++) {
       const front = cuts.fronts[i], next = cuts.fronts[i + 1], nose = cuts.noses[i];
       const between = (a,b) => cuts.sides.map((side,j) => interval(side, a.hits[j], b.hits[j]));
       const [inner, outer] = between(nose,cuts.seatEnds[i+1]);
       const polygon = (innerSide, outerSide) => [...outerSide, ...innerSide.toReversed()];
-      const physical = polygon(inner, outer);
+      const physical = trimAtNewels(polygon(inner, outer),posts,nose,cuts.seatEnds[i+1],true);
       const points = physical.map(reflect);
       if (polygonArea(points) < 0) points.reverse();
       const area = polygonArea(points);
@@ -460,16 +514,20 @@ export function generateWinderGeometry(stair, family, options) {
       const visible = between(nose,cuts.faces[i+1]);
       const seat = index => {
         const start = cuts.faces[index], end = cuts.boardBacks[index];
-        const points = polygon(...between(start,end)).map(reflect);
+        const points = trimAtNewels(polygon(...between(start,end)),posts,start,end,false).map(reflect);
         if (polygonArea(points)<0) points.reverse();
         return {points,direction:reflect(start.forward)};
       };
+      const onNose = physical.filter(p=>Math.abs(dot(sub(p,nose.at),nose.forward))<1e-5);
+      const toStart=p=>mag(sub(p,nose.hits[0].point));
+      onNose.sort((a,b)=>toStart(a)-toStart(b));
+      const frontEdge=posts.length && onNose.length>=2 ? [onNose[0],onNose.at(-1)].map(reflect) : nose.hits.map(hit=>reflect(hit.point));
       const eligibleAt170Mm = goingBandWidth(front.hits.map(hit => hit.point), front.forward, goingContour, 170);
       treads.push({ id: `${stair.mark}-TD-${String(i + 1).padStart(2,'0')}`, flightIndex: 0, step: i + 1,
         level: i + 1, elevation: (i + 1) * rise, thickness: stair.treadThickness, length: Math.max(...widths) - Math.min(...widths),
         width: Math.max(...heights) - Math.min(...heights), center, direction: reflect(front.forward),
         points, svgPoints: svgPoints(points), area, volume: area * stair.treadThickness / 1e9,
-        frontEdge: nose.hits.map(hit => reflect(hit.point)), isWinder, eligibleAt170Mm, goingAtWalkline: normalDepth(goingContour,front),
+        frontEdge, isWinder, eligibleAt170Mm, goingAtWalkline: normalDepth(goingContour,front),
         depthAtWalkline: normalDepth(polygon(...visible),nose), narrowDepth: Math.min(...visible.map(edgeLength)),
         ...(cuts.boards ? {riserSeat:seat(i), ...(i===treadCount-1 ? {exitRiserSeat:seat(i+1)} : {})} : {}) });
     }
@@ -480,7 +538,8 @@ export function generateWinderGeometry(stair, family, options) {
     }
   }
   const stringers = cuts ? makeBeams(cuts, stair, rise, reflect) : [];
-  const layout = { treads, stringers, landings };
+  const newels=finishNewels(posts,treads,reflect);
+  const layout = { treads, stringers, landings, newels };
   return { ...layout, flights: dimensions.flights, dimensions, walkline,
-    ...buildStairViews(layout, stair.width, options), ...buildWinderSchedule(treads, stringers) };
+    ...buildStairViews(layout, stair.width, options), ...buildWinderSchedule(treads, stringers, newels) };
 }

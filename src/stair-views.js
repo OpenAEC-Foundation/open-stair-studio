@@ -1,5 +1,5 @@
-export function buildStairViews({ treads, landings, stringers }, width, { projectIsometric = true } = {}) {
-  const allPlanPoints = [...treads.flatMap(tread => tread.points), ...landings.flatMap(landing => landing.points), ...stringers.flatMap(stringer => stringer.points)];
+export function buildStairViews({ treads, landings, stringers, newels = [] }, width, { projectIsometric = true } = {}) {
+  const allPlanPoints = [...treads, ...landings, ...stringers, ...newels].flatMap(part => part.points);
   if (!allPlanPoints.length) {
     return { planBox: { x: -100, y: -100, width: 200, height: 200 }, footprint: { x: 0, y: 0, width: 0, depth: 0 }, isoFaces: [] };
   }
@@ -11,11 +11,11 @@ export function buildStairViews({ treads, landings, stringers }, width, { projec
   const planBox = { x: minX - pad, y: minY - pad, width: Math.max(1, maxX - minX + 2 * pad), height: Math.max(1, maxY - minY + 2 * pad) };
   const footprint = { x: minX, y: minY, width: maxX - minX, depth: maxY - minY };
 
-  return { planBox, footprint, isoFaces: projectIsometric ? projectStair({ treads, landings, stringers }) : [] };
+  return { planBox, footprint, isoFaces: projectIsometric ? projectStair({ treads, landings, stringers, newels }) : [] };
 }
 
-export function projectStair({ treads, landings, stringers }, quarterTurns = 0) {
-  if (!treads.length && !landings.length && !stringers.length) return [];
+export function projectStair({ treads, landings, stringers, newels = [] }, quarterTurns = 0) {
+  if (!treads.length && !landings.length && !stringers.length && !newels.length) return [];
   const rawFaces = [];
   const cos = [1, 0, -1, 0][quarterTurns], sin = [0, 1, 0, -1][quarterTurns];
   // Camera at (+X, -Y, +Z), world +Z up, SVG +Y down.
@@ -51,6 +51,9 @@ export function projectStair({ treads, landings, stringers }, quarterTurns = 0) 
   }
   treads.forEach(tread => addBoard(tread, 'top'));
   landings.forEach(landing => addBoard(landing, 'landing'));
+  for (const post of newels) {
+    for (const face of post.meshFaces) addFace(face, 'stringer');
+  }
   for (const stringer of stringers) {
     if (stringer.meshFaces) {
       for (const face of stringer.meshFaces) addFace(face, 'stringer');

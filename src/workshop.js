@@ -67,7 +67,7 @@ export function buildWorkshop(geometry, model, designDetails) {
       blankVolume: beam.blankVolume ?? beam.volume
     };
   });
-  const schedule = buildWinderSchedule(treads, beams);
+  const schedule = buildWinderSchedule(treads, beams, geometry.newels);
   for (const landing of geometry.landings) {
     schedule.parts.push({ ...landing, name: names.get(landing.id), kind: 'landing', quantity: 1, blankVolume: landing.blankVolume??landing.volume });
     schedule.volume += landing.volume;

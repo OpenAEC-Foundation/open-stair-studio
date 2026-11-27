@@ -1,4 +1,5 @@
 import { tessellate } from './ifc-tessellate.js';
+import { newelShell } from './newel-shell.js';
 import { compressedModelGuid, ifcModelId } from './ifc-identity.js';
 import { stairMeasureProperties } from './ifc-stair-properties.js';
 import { effectiveWel } from './timber-riser.js';
@@ -297,6 +298,7 @@ function writeModel(api, sid, model, geometry) {
       }
     }
   }
+  const newels = engineeredTreads ? [] : geometry.newels ?? [];
   function finishedBody(hostId, blank) {
     const cuts = cutsByHost.get(hostId);
     if (!cuts?.length) return representation([blank]);
@@ -327,6 +329,7 @@ function writeModel(api, sid, model, geometry) {
   const typedDetails = new Map();
   const treadObjects = [];
   const timberStringers = [];
+  const timberNewels = [];
   const timberTreads = [];
   const joineryHosts = new Map();
   const partRelations = [];
@@ -400,6 +403,37 @@ function writeModel(api, sid, model, geometry) {
         addNetVolume(object,'Qto_MemberBaseQuantities',netByHost.get(beam.id) ?? beam.volume);
         parts.push(object);
         joineryHosts.set(beam.id, object);
+      }
+    }
+    if (flight.index === 0) for (const post of newels) {
+      const prefix = post.corner+'Newel';
+      const name = post.corner === 'lower' ? 'Onderspil' : 'Bovenspil';
+      // Export the finished pocket walls once. Re-evaluating nearly coplanar
+      // cuts in downstream mesh readers moved the back of the pocket on TD15.
+      const body = post.pockets.length ? meshRepresentation(newelShell(post)) :
+        representation([polygonPrism({...post,elevation:post.upperZ,thickness:post.upperZ-post.lowerZ})]);
+      const obj = e(IFC.IFCMEMBER, partGuid(post.id), null, label(name), null, label('Houten trapspil'),
+        localPlacement(flightPlacement), body, identifier(post.id), enumValue('POST'));
+      parts.push(obj);
+      timberNewels.push(obj);
+      timberObjects.push(obj);
+      addNetVolume(obj,'Qto_MemberBaseQuantities',post.volume);
+      const fields = [
+        ['Corner',IFC.IFCLABEL,post.corner],
+        ['Connection',IFC.IFCLABEL,stair[prefix+'Housing'] > 0 ? 'Housed' : 'Butt'],
+        ...['Width','Depth','OffsetAlong','OffsetAcross','Base','Top','EndGoing','Housing','Clearance'].map(key =>
+          [key+'_mm',IFC.IFCLENGTHMEASURE,stair[prefix+key]]),
+        ['ConnectedTreads',IFC.IFCINTEGER,post.connectedTreadIds.length],
+        ['Pockets',IFC.IFCINTEGER,post.pockets.length]
+      ];
+      const properties = e(IFC.IFCPROPERTYSET,guid('pset','newel',partKey(post.id)),null,label('OSS_Spil'),null,fields.map(singleProperty));
+      partRelations.push(relationship(IFC.IFCRELDEFINESBYPROPERTIES,[obj],properties));
+      for (const id of post.connectedTreadIds) {
+        const treadObject = joineryHosts.get(id);
+        if (!treadObject) throw new Error('Ontbrekende trede bij spilaansluiting '+id);
+        const pocket = post.pockets.find(p => p.treadId === id);
+        partRelations.push(e(IFC.IFCRELCONNECTSELEMENTS,guid('newel-joint',partKey(post.id),partKey(id)),
+          null,label(pocket?.id ?? post.id+' / '+id),null,null,obj,treadObject));
       }
     }
     const flightObject = e(IFC.IFCSTAIRFLIGHT, guid('flight', flight.index), null,
@@ -493,12 +527,14 @@ function writeModel(api, sid, model, geometry) {
   const detailMaterials = new Map();
   const indexedDetail=p=>p.stockVolumeM3>0 && (stair.timberDetail && stair.timberDetail!=='basic' || stair.wellatType==='chamfered');
   const indexedDetailCount=detailParts.filter(indexedDetail).length;
+  function meshRepresentation({coordinates,triangles}){
+    const coords=e(IFC.IFCCARTESIANPOINTLIST3D,coordinates.map(v=>v.map(length)));
+    const indices=triangles.map(t=>t.map(n=>api.CreateIfcType(sid,IFC.IFCPOSITIVEINTEGER,n)));
+    return representation([e(IFC.IFCTRIANGULATEDFACESET,coords,null,enumValue('T'),indices,null)],'Tessellation');
+  }
   function detailSolid(part){
     if(indexedDetail(part)){
-      const {coordinates,triangles}=tessellate(part,p=>[p.x,p.y,p.z]);
-      const coords=e(IFC.IFCCARTESIANPOINTLIST3D,coordinates.map(v=>v.map(length)));
-      const indices=triangles.map(t=>t.map(n=>api.CreateIfcType(sid,IFC.IFCPOSITIVEINTEGER,n)));
-      return representation([e(IFC.IFCTRIANGULATEDFACESET,coords,null,enumValue('T'),indices,null)],'Tessellation');
+      return meshRepresentation(tessellate(part,p=>[p.x,p.y,p.z]));
     }
     const vertices=new Map();
     const faces=part.faces.map(polygon=>{
@@ -598,6 +634,7 @@ function writeModel(api, sid, model, geometry) {
   assignType(treadObjects, IFC.IFCPLATETYPE, `${dossier.structureLabel} · trede`, 'USERDEFINED');
   assignType(timberTreads, IFC.IFCPLATETYPE, 'Houten trede', 'USERDEFINED');
   assignType(timberStringers, IFC.IFCMEMBERTYPE, 'Houten trapboom', 'STRINGER');
+  assignType(timberNewels, IFC.IFCMEMBERTYPE, 'Houten trapspil', 'POST');
   assignType(reservedObjects, IFC.IFCBUILDINGELEMENTPROXYTYPE, 'Ruimtereservering trapconstructie', 'PROVISIONFORSPACE');
   for (const [key, objects] of typedDetails) {
     const [kind, role] = key.split(':');
@@ -650,12 +687,12 @@ function writeModel(api, sid, model, geometry) {
     const solidCount = count(IFC.IFCEXTRUDEDAREASOLID) - cutterCount + brepCount + count(IFC.IFCTRIANGULATEDFACESET);
     const surfaceCount = count(IFC.IFCFACEBASEDSURFACEMODEL);
     const expectedBreps = geometry.stringers.filter(beam=>!!beam.faces).length + detailParts.length - indexedDetailCount + profiledTreadBrepCount + screwObjects.length;
-    const expectedSolids = (surfaceTreads ? 0 : geometry.treads.length) + geometry.landings.length + geometry.stringers.length + detailParts.length + frameObjects.length + screwObjects.length;
+    const expectedSolids = (surfaceTreads ? 0 : geometry.treads.length) + geometry.landings.length + geometry.stringers.length + newels.length + detailParts.length + frameObjects.length + screwObjects.length;
     if (schema !== IFC.Schemas.IFC4 || stairCount !== 1 || flightCount !== geometry.flights.length ||
         count(IFC.IFCBOOLEANRESULT) !== cutterCount ||
         count(IFC.IFCPLATE) !== (engineeredTreads ? geometry.treads.length : timberTreads.length) + detailParts.filter(p=>p.kind==='plate').length ||
         count(IFC.IFCRAILING) !== detailParts.filter(p=>p.kind==='railing').length ||
-        count(IFC.IFCMEMBER) !== timberStringers.length + detailParts.filter(p=>p.kind==='member').length ||
+        count(IFC.IFCMEMBER) !== timberStringers.length + timberNewels.length + detailParts.filter(p=>p.kind==='member').length ||
         count(IFC.IFCBUILDINGELEMENTPROXY) !== (engineeredTreads ? geometry.stringers.length + geometry.landings.length : 0) ||
         surfaceCount !== (surfaceTreads ? geometry.treads.length : 0) ||
         landingCount !== geometry.landings.length || count(IFC.IFCBEAM) !== frameObjects.length ||

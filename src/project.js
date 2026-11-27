@@ -3,7 +3,7 @@ import { isWinder } from './winder.js';
 import { readWell } from './stairwell.js';
 import { ifcModelId } from './ifc-identity.js';
 import {timberDimensions, timberStyles, noseNames} from './timber-settings.js';
-import {devriesTwoQuarterSettings, equalQuarterAngles, quarterAngleError} from './two-quarter-settings.js';
+import {devriesIfcDepth, devriesNewelSettings, equalQuarterAngles, newelDimensions, quarterAngleError} from './two-quarter-settings.js';
 import { validateCamField } from './housing-cam.js';
 import { validateTreadCamField } from './tread-cam.js';
 import { validateRiserCamField } from './riser-board-settings.js';
@@ -13,7 +13,9 @@ export const draftKey = 'open-stair-studio:draft';
 const sections = ['project', 'bim', 'stair', 'regulatory', 'building', 'estimate', 'joinery', 'cam', 'treadCam', 'riserCam', 'riserDetailCam', 'engineering'];
 const systemFields = ['support', 'sourceProduct', 'productBasis', 'arrangement', 'customDescription', 'spanMm', ...materialFieldKeys];
 const systemValues = engineering => Object.fromEntries(systemFields.map(key => [key, engineering[key]]));
+const newelFields = ['lower','upper'].flatMap(corner => newelDimensions.map(field => ({...field, key:corner+'Newel'+field.suffix})));
 const ranges = {
+  ...Object.fromEntries(newelFields.map(f => [f.key,[f.min,f.max]])),
   ...Object.fromEntries(timberDimensions.map(f=>[f.key,[f.min,f.max]])), noseSize:[0.5,25],wellatWidth:[3,35],wellatHeight:[5,45],
   railHeight:[650,1350], riserThickness:[8,42], riserTopInset:[0,80], riserBottomInset:[8,100],
   depth: [0.1, 150], clearance: [0, 10], endMargin: [0, 300], riserGrooveDepth: [1, 30],
@@ -30,6 +32,7 @@ const ranges = {
   nosing: [-60, 100], wel: [0, 100], treadThickness: [10], wasteFactor: [1, 3], marginPercent: [0, 99]
 };
 const labels = {
+  ...Object.fromEntries(newelFields.map(f => [f.key,f.label])),
   ...Object.fromEntries(timberDimensions.map(f=>[f.key,f.label])), noseSize:'Profielmaat tredeneus',
   depth: 'Insteekdiepte', clearance: 'Totale passpeling', endMargin: 'Schoudermaat', riserGrooveDepth: 'Groefdiepte stootbord',
   floorHeight: 'Vloerhoogte', width: 'Trapbreedte', going: 'Aantrede', risers: 'Aantal optredes',
@@ -191,7 +194,7 @@ export function editSession(session, section, key, value) {
   if(section==='stair'&&key==='riserPosition'&&value==='manual') model.stair.riserJoint='butt';
   // Surveyed widths refer to a particular stair layout. Undo restores both
   // the geometry and the measurements for that layout together.
-  if (section === 'stair' && ['width', 'stringerThickness', 'stringerLeft','stringerRight','stringerOverhang','type', 'turnDirection', 'outerShape', 'twoQuarterLayout', 'outerLength', 'outerDepth', 'middleOffset', 'firstQuarterAngles', 'secondQuarterAngles', 'laneGap', 'going', 'risers', 'windersPerQuarter', 'middleSteps', 'entrySteps', 'nosing', 'wel', 'landingLength','landingRiser'].includes(key)) {
+  if (section === 'stair' && (/^(lower|upper)Newel/.test(key) || ['width', 'stringerThickness', 'stringerLeft','stringerRight','stringerOverhang','type', 'turnDirection', 'outerShape', 'twoQuarterLayout', 'outerLength', 'outerDepth', 'middleOffset', 'firstQuarterAngles', 'secondQuarterAngles', 'laneGap', 'going', 'risers', 'windersPerQuarter', 'middleSteps', 'entrySteps', 'nosing', 'wel', 'landingLength','landingRiser'].includes(key))) {
     model.engineering = { ...model.engineering, escapeWinderWidth: null };
     if (['type', 'width', 'stringerThickness'].includes(key)) model.engineering.escapeWidth = null;
   }
@@ -205,9 +208,10 @@ export function editSession(session, section, key, value) {
   return { ...session, model, history: [...session.history.slice(-49), session.model], future: [] };
 }
 
-export function applyTwoQuarterReference(session) {
+export function applyTwoQuarterReference(session, size = 'nominal') {
   const model = {...session.model, stairEnabled: true,
-    stair: {...session.model.stair, ...structuredClone(devriesTwoQuarterSettings)},
+    stair: {...session.model.stair, ...structuredClone(devriesNewelSettings),
+      outerDepth:size==='ifc' ? devriesIfcDepth : devriesNewelSettings.outerDepth},
     joinery: {...session.model.joinery, type: 'none'},
     engineering: {...session.model.engineering, escapeWidth: null, escapeWinderWidth: null}};
   return {...session, model, history: [...session.history.slice(-49), session.model], future: []};

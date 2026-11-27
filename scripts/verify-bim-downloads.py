@@ -117,19 +117,29 @@ def check(page, download):
     assert page.locator('#two-quarter-layout').input_value() == 'dimensioned'
     assert float(page.locator('#middle-offset').input_value()) == 20.034
     assert page.locator('#turn-direction').input_value() == 'right'
-    for hand, size in [('left', (3140, 992)), ('right', (3300, 1100))]:
-        mark = 'MAAT-' + hand.upper()
+    for hand, size in [('left', (3140, 992)), ('right', (3140, 992)), ('right', (3300, 1100))]:
+        fitted = size == (3140, 992)
+        mark = ('SPIL-' if fitted else 'MAAT-') + hand.upper()
         page.locator('#turn-direction').select_option(hand)
         page.locator('#stair-mark').fill(mark)
+        if fitted:
+            assert page.locator('#lowerNewelEnabled').is_checked() and page.locator('#upperNewelEnabled').is_checked()
+            if hand == 'right':
+                page.get_by_text('Bovenspil · 114 × 66 mm', exact=True).click()
+                set_mm('#upperNewelHousing', 5)
+        else:
+            page.locator('#lowerNewelEnabled').uncheck()
+            page.locator('#upperNewelEnabled').uncheck()
         set_mm('#outer-length', size[0])
         set_mm('#outer-depth', size[1])
-        if hand == 'right':
+        if not fitted:
             for index, angle in enumerate([15, 17, 19, 20]):
                 set_mm('#upper-quarter-' + str(index), angle)
         project_path = download('Opslaan', '.oss.json')
         settings = json.loads(project_path.read_text(encoding='utf-8'))['stair']
         assert settings['firstQuarterAngles'][0] == 18.533
-        if hand == 'right':
+        assert settings['upperNewelEnabled'] == fitted
+        if not fitted:
             assert settings['secondQuarterAngles'] == [15, 17, 19, 20, 19]
         project_file.set_input_files(project_path)
         page.get_by_text(f'{mark} · Dichte steektrap', exact=True).first.wait_for()
@@ -137,6 +147,14 @@ def check(page, download):
         step_path = download(panel.get_by_role('button', name='IFC4 exporteren'), '.ifc')
         layer_path = download(panel.get_by_role('button', name='IFCX alpha exporteren'), '.ifcx')
         model = verify_download_pair(step_path, layer_path, {mark})
+        posts = [p for p in model.by_type('IfcMember') if element.get_pset(p, 'OSS_Spil')]
+        assert len(posts) == (2 if fitted else 0)
+        for post in posts:
+            data = element.get_pset(post, 'OSS_Spil')
+            depth = settings[data['Corner'] + 'NewelHousing']
+            assert data['Housing_mm'] == depth and data['ConnectedTreads'] == 6
+            assert len(post.ConnectedTo) == 6 and all(rel.RelatedElement.is_a('IfcPlate') for rel in post.ConnectedTo)
+            assert data['Pockets'] == (6 if depth else 0)
         props = element.get_pset(model.by_type('IfcStair')[0], 'Pset_OpenStairStudio_Design')
         assert props['TwoQuarterLayout'] == 'dimensioned' and 'WindersPerQuarter' not in props
         assert props['MiddleStraightOffset_mm'] == 20.034
@@ -148,6 +166,29 @@ def check(page, download):
         meshes = [n['attributes']['usd::usdgeom::mesh']['points'] for n in json.loads(layer_path.read_text(encoding='utf-8'))['data']
                   if 'usd::usdgeom::mesh' in n['attributes']]
         np.testing.assert_allclose(sorted(np.ptp(np.vstack(meshes), axis=0)[:2] * 1000, reverse=True), size, atol=.02, rtol=0)
+        if fitted and hand == 'right':
+            page.get_by_role('tab', name='Werkstroom Werkvoorbereiding').click()
+            page.get_by_role('button', name='Houtdetails en profielen').click()
+            page.get_by_label('Onderdeelgroep').select_option('quarterNewel')
+            page.get_by_label('Onderdeelmerk').select_option(mark + '-SP-02')
+            drawing = download('Detail-DXF', '.dxf').read_text(encoding='utf-8')
+            assert 'OSS-SPIL' in drawing
+            setups = page.get_by_role('combobox', name='Spilvlak')
+            faces = setups.locator('option').count()
+            assert faces >= 2
+            for index in range(faces):
+                setups.select_option(index=index)
+                nc = download('Spilhuizen voorfrezen · LinuxCNC', '.ngc').read_text(encoding='utf-8')
+                assert mark + '-SP-02' in nc and 'G54' in nc and 'G1 Z-' in nc and nc.endswith('M2\n')
+
+    page.locator('#reference-size').select_option('ifc')
+    page.get_by_role('button', name='De Vries-voorbeeld toepassen').click()
+    assert float(page.locator('#outer-depth').input_value()) == 992.105
+    assert page.locator('svg polygon.plan-newel').count() == 2
+    page.locator('#stair-mark').fill('BRONMAAT')
+    page.locator('#stair-mark').press('Tab')
+    saved_source = download('Opslaan', '.oss.json')
+    assert json.loads(saved_source.read_text(encoding='utf-8'))['stair']['outerDepth'] == 992.105
 
     config = json.loads((EXAMPLES / 'zes-trapontwerpen.oss.json').read_text(encoding='utf-8'))
     items = [i for i in config['stairwell']['instances'] if i['type'] in ('portable', 'ladder')]

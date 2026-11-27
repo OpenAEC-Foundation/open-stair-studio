@@ -85,6 +85,7 @@ export function buildViewportMesh(geometry, system = 'timber') {
       edges.push({p:edge.a,normal:edge.normal,color:edgeInk},{p:edge.b,normal:edge.normal,color:edgeInk});
     }
   }
+  for (const post of geometry.newels ?? []) mesh(post.meshFaces, stringerColor);
   for (const part of geometry.componentParts ?? []) {
     const materialColor=part.targetId && part.kind==='rebar'?[111,79,154,255]:componentColors[part.material]??timber;
     mesh(part.faces,materialColor,part.role==='gratingTread'||part.role==='platformDeck'?[119,132,138,255]:outline);

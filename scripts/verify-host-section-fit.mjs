@@ -63,4 +63,8 @@ for (const [name,rings,model,expected,bim] of tests) {
   if(actual!==expected){ ++failures; console.error(name,actual,'verwacht',expected); }
 }
 assert.equal(failures,0);
+const post = {meshFaces:ringWalls(island).map(face=>face.map(([x,y,z])=>({x,y,z})))};
+const besideFloor = {treads:[plate(rect(2000,0,2100,100))],landings:[],stringers:[],newels:[post]};
+assert.equal(checkHostFit(besideFloor,host([[floor,island]])).status,'outside');
+assert.equal(checkHostFit(besideFloor,host([[island]])).status,'precheck');
 console.log(`Hostpassing: ${tests.length} vlakdoorsneden met inspringing, eiland, contact en overlappende objecten.`);

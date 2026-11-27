@@ -86,6 +86,9 @@
         <dt>Ruwbreedte</dt><dd>{length(selected.width)} mm</dd>
         <dt>CNC-opspanmaat · L × B</dt><dd>{length(selected.length + 2*stockMargin)} × {length(selected.width + 2*stockMargin)} mm</dd>
         <dt>Dikte</dt><dd>{length(selected.thickness)} mm</dd>
+        {#each selected.newelJoints ?? [] as joint}
+          <dt>Spilaansluiting {joint.postId}</dt><dd>{joint.depth > 0 ? length(joint.depth)+' mm insteek' : 'Stuikend'}</dd>
+        {/each}
         <dt>Aantrede bij klimlijn</dt><dd>{length(selected.goingAtWalkline)} mm</dd>
         <dt>Tredevlak bij klimlijn</dt><dd>{length(selected.depthAtWalkline)} mm</dd>
         <dt>Kortste zijmaat langs wang</dt><dd>{length(selected.narrowDepth)} mm</dd>

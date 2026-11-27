@@ -1,7 +1,42 @@
 import earcut from 'earcut';
 
-export function tessellate(part, toLocal) {
-  const coordinates = [], triangles = [], indices = new Map();
+// A triangulated long cheek edge can meet several shorter edges of the
+// neighbouring pocket walls. Split it at their existing vertices. A fan
+// about the interior of each affected triangle retains every short edge,
+// including collinear ones which earcut is normally free to simplify.
+function splitTriangleEdges(coordinates, triangles) {
+  const vertices=coordinates.slice(),result=[],cache=new Map();
+  function innerVertices(start,end) {
+    if(start>end) return innerVertices(end,start).toReversed();
+    const key=start+','+end;
+    if(cache.has(key))return cache.get(key);
+    const a=vertices[start-1],b=vertices[end-1],delta=b.map((x,i)=>x-a[i]);
+    const length2=delta.reduce((sum,x)=>sum+x*x,0);
+    const inner=[];
+    for(const [i,p] of vertices.entries()){
+      if(i+1===start || i+1===end)continue;
+      const t=delta.reduce((sum,x,k)=>sum+x*(p[k]-a[k]),0)/length2;
+      if(t<=0||t>=1)continue;
+      // Coordinates entering the tessellation are rounded to a micrometre
+      // fraction (10^-6 mm). Account for this independent vertex rounding.
+      if(Math.hypot(...p.map((x,k)=>x-a[k]-t*delta[k]))<=.000002) inner.push({t,id:i+1});
+    }
+    const ids=inner.sort((p,q)=>p.t-q.t).map(p=>p.id);
+    cache.set(key,ids);
+    return ids;
+  }
+  for(const tri of triangles) {
+    const loop=tri.flatMap((a,i)=>[a,...innerVertices(a,tri[(i+1)%3])]);
+    if(loop.length===3){result.push(tri);continue;}
+    const center=coordinates.push([0,1,2].map(axis=>tri.reduce((sum,v)=>sum+vertices[v-1][axis],0)/3));
+    for(const [i,v] of loop.entries())result.push([center,v,loop[(i+1)%loop.length]]);
+  }
+  return result;
+}
+
+export function tessellate(part, toLocal, options = {}) {
+  const coordinates = [], indices = new Map();
+  let triangles = [];
   const vertex = p => {
     const xyz = toLocal(p).map(v => Math.round(v*1e6)/1e6);
     if (!xyz.every(Number.isFinite)) throw new Error('Niet-eindige coördinaat in '+part.label+'.');
@@ -32,6 +67,7 @@ export function tessellate(part, toLocal) {
   // An apparently closed boundary can have a self-intersection within one
   // concave profile. Never mark the IFC tessellation closed if the resulting
   // triangles leave a gap, share inconsistent winding or carry no volume.
+  if(options.splitTJunctions)triangles=splitTriangleEdges(coordinates,triangles);
   const edges = new Map();
   let signedVolume = 0;
   for (const t of triangles) {
@@ -49,6 +85,10 @@ export function tessellate(part, toLocal) {
   }
   if (!(signedVolume>0) || [...edges.values()].some(([a,b])=>a!==1 || b!==1)) {
     throw new Error('De triangulatie vormt geen gesloten volume voor '+part.label+'. Controleer de onderdeelgeometrie.');
+  }
+  if(options.expectedVolumeMm3!=null &&
+      Math.abs(signedVolume/6-options.expectedVolumeMm3)>Math.max(.01,options.expectedVolumeMm3*1e-7)){
+    throw new Error('Het gesloten meshvolume wijkt af van de houtstaat voor '+part.label+'.');
   }
   return {coordinates,triangles};
 }

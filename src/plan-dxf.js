@@ -1,12 +1,13 @@
 import Drawing from 'dxf-writer';
 
-export function createPlanDxf({ treads, landings, stringers, walkline }) {
+export function createPlanDxf({ treads, landings, stringers, newels = [], walkline }) {
   const drawing = new Drawing();
   drawing.setUnits('Millimeters');
   for (const [layer, parts] of [
     ['OSS-TREAD', treads],
     ['OSS-LANDING', landings],
-    ['OSS-STRINGER', stringers]
+    ['OSS-STRINGER', stringers],
+    ['OSS-NEWEL', newels]
   ]) {
     drawing.addLayer(layer, Drawing.ACI.WHITE, 'CONTINUOUS');
     drawing.setActiveLayer(layer);

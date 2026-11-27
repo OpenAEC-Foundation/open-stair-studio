@@ -188,7 +188,7 @@
   const referenceByStair = new WeakMap();
   function geometryFor(stair, timber) {
     const cache=timber?geometryByStair:referenceByStair;
-    if (!cache.has(stair)) cache.set(stair, generateStairGeometry(timber?stair:{...stair,riserJoint:'butt',wel:null}, { projectIsometric: false }));
+    if (!cache.has(stair)) cache.set(stair, generateStairGeometry(timber?stair:{...stair,riserJoint:'butt',wel:null,lowerNewelEnabled:false,upperNewelEnabled:false}, { projectIsometric: false }));
     return cache.get(stair);
   }
   $: geometry = geometryFor(model.stair,timberSystem);
@@ -207,6 +207,7 @@
     {...geometry,housings:workshop.housings,riserJoinery:workshop.riserJoinery,
     treads:isolated==='boards'?[]:timberSystem?workshop.treads:geometry.treads,landings:isolated==='boards'?[]:geometry.landings,
     componentParts:isolated==='boards'?details.filter(p=>p.role==='riser'||p.role==='nosingStrip'):[...details,...(timberSystem?[...(geometry.landingFrame??[]),...(geometry.landingFasteners??[])]:[])],
+    newels:timberSystem && isolated!=='boards' ? geometry.newels : [],
     stringers:isolated==='boards'?[]:geometry.stringers};
   $: materialLabel = timberSystem ? model.stair.material : structureTypes.find(type => type.id === model.engineering.structureType)?.label;
   $: referenceRows = timberSystem ? [] : referenceTreadRows(geometry);
@@ -403,8 +404,8 @@
     rightTab = 'Eigenschappen';
     activeView = stairFamilies.find(f => f.id === type)?.winder ? 'Plattegrond' : '3D-model';
   }
-  function useTwoQuarterReference() {
-    commitSession(applyTwoQuarterReference(session), 'Voorbeeldmaten De Vries toegepast');
+  function useTwoQuarterReference(size) {
+    commitSession(applyTwoQuarterReference(session,size), 'Voorbeeldmaten De Vries toegepast');
     resetPartSelection();
     activeView = 'Plattegrond';
   }
@@ -582,6 +583,7 @@
           <button class="tree-item" class:selected={activeView!=='Trapontwerp' && selectedItem === model.stair.mark} onclick={() => {selectedItem=model.stair.mark; activeView='3D-model';activeRibbon='Trap ontwerpen';}}><span class="tree-indent"></span><span class="tree-stair-icon">▱</span><div><b>{model.stair.mark} · {model.stair.name}</b><small>{dimensions.family.label} · Concept</small></div></button>
           <div class="tree-child"><span class="tree-indent"></span><span>└</span><span>Treden</span><small>{dimensions.treadCount}</small></div>
           <div class="tree-child"><span class="tree-indent"></span><span>└</span><span>{dimensions.family.winder ? 'Wangdelen' : 'Trapbomen'}</span><small>{geometry.stringers.length}</small></div>
+          {#if geometry.newels?.length}<div class="tree-child"><span class="tree-indent"></span><span>└</span><span>Spillen</span><small>{geometry.newels.length}</small></div>{/if}
           <div class="tree-child"><span class="tree-indent"></span><span>└</span><span>Leuning</span><small>{model.stair.railSide && model.stair.railSide!=='none' ? 'Gemodelleerd' : 'Zonder leuning'}</small></div>
           {:else if !well.instances.length}<p class="empty-tree-note">Nog geen trap toegevoegd.</p>{/if}
           <div class="tree-node collapsed"><span class="chevron">›</span><span class="tree-emoji">▱</span><b>Begane grond</b></div>
@@ -698,6 +700,9 @@
                 {#each geometry.landings as landing}<polygon points={landing.svgPoints} class="plan-landing" />{/each}
                 {#each geometry.landingFrame??[] as member}<polygon points={member.svgPoints} class="plan-stringer" />{/each}
                 {#each geometry.stringers as stringer}<polygon points={stringer.svgPoints} class="plan-stringer" />{/each}
+                {#each geometry.newels??[] as post}
+                  <polygon points={post.svgPoints} class="plan-newel"><title>{post.corner==='lower'?'Onderspil':'Bovenspil'} · {post.id}</title></polygon>
+                {/each}
                 {#if dimensions.family.winder && showWalkline}
                   <polyline points={geometry.walkline.map(p => p.x + ',' + p.y).join(' ')} class="walk-line" />
                 {/if}
@@ -765,7 +770,7 @@
             <label for="tread-system">Tredesysteem</label><select id="tread-system" value={model.engineering.structureType} onchange={e => { updateEngineering('structureType', e.currentTarget.value); selectRibbon('Engineering'); }}>{#each structureTypes as type}<option value={type.id}>{type.label}</option>{/each}</select>
           </div>
           {#if timberSystem && geometry.stringers.some(beam=>beam.profile!=='cut') && (activeView === 'Wangbladen' || activeView === 'CNC-machine')}<JoineryControls joinery={model.joinery} update={updateJoinery} riserGrooves={!!workshop.riserJoinery} />{/if}
-          {#if dimensions.family.winder}<WinderControls stair={model.stair} {geometry} {details} {update} applyReference={useTwoQuarterReference} showPlan={() => activeView = 'Plattegrond'} />{/if}
+          {#if dimensions.family.winder}<WinderControls stair={model.stair} {geometry} {details} {update} timber={timberSystem} applyReference={useTwoQuarterReference} showPlan={() => activeView = 'Plattegrond'} />{/if}
           <div class="property-section"><h3>Project en trap <span>⌃</span></h3><label for="project-name">Projectnaam</label><input class="text-field" id="project-name" value={model.project.name} oninput={e => updateRoot('project','name',e.currentTarget.value)} /><label for="project-number">Projectnummer</label><input class="text-field" id="project-number" value={model.project.number} oninput={e => updateRoot('project','number',e.currentTarget.value)} /><label for="project-revision">Revisie</label><input class="text-field" id="project-revision" value={model.project.revision} oninput={e => updateRoot('project','revision',e.currentTarget.value)} /><label for="project-client">Opdrachtgever</label><input class="text-field" id="project-client" value={model.project.client} oninput={e => updateRoot('project','client',e.currentTarget.value)} /><label for="project-location">Projectlocatie</label><input class="text-field" id="project-location" value={model.project.location} oninput={e => updateRoot('project','location',e.currentTarget.value)} /><label for="stair-mark">Trapmerk</label><input class="text-field" id="stair-mark" value={model.stair.mark} oninput={e => update('mark',e.currentTarget.value)} /><label for="stair-name">Trapomschrijving</label><input class="text-field" id="stair-name" value={model.stair.name} oninput={e => update('name',e.currentTarget.value)} /></div>
           <div class="property-section"><h3>Trapgeometrie <span>⌃</span></h3>
             <label for="floor-height">Vloerhoogte</label><div class="numeric-input"><input id="floor-height" type="number" min="100" max="10000" step="10" value={model.stair.floorHeight} onchange={e => update('floorHeight', e.currentTarget)} /><span>mm</span></div>

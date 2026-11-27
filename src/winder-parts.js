@@ -48,8 +48,20 @@ export function treadPart(tread) {
   };
 }
 
-export function buildWinderSchedule(treads, stringers) {
+export function buildWinderSchedule(treads, stringers, newels = []) {
   const parts = treads.map(treadPart);
+  for (const post of newels) {
+    const connected = new Set(post.connectedTreadIds);
+    for (const part of parts.filter(p => p.kind === 'tread' && connected.has(p.id))) {
+      const pocket = post.pockets.find(p => p.treadId === part.id);
+      (part.newelJoints ??= []).push({ postId: post.id, depth: pocket?.depth ?? 0 });
+    }
+    parts.push({
+      id: post.id, name: post.corner === 'lower' ? 'Onderspil' : 'Bovenspil', kind: 'quarterNewel',
+      quantity: 1, length: post.height, width: post.length, thickness: post.width,
+      volume: post.volume, blankVolume: post.blankVolume, pocketCount: post.pockets.length
+    });
+  }
   for (const beam of stringers) {
     parts.push({
       id: beam.id, name: beam.name ?? 'Wangsegment', kind: 'stringer',
@@ -81,20 +93,24 @@ export function makePartsCsvRows(geometry, material, cncStock) {
   }
   const mm = v => v == null ? '' : Number(v.toFixed(3));
   const hasProfiles=geometry.parts.some(p=>p.noseDetail);
+  const hasNewels=geometry.parts.some(p=>p.kind==='quarterNewel');
   const header = ['Merk', 'Onderdeel', 'Aantal', 'Ruwlengte mm', 'Ruwbreedte mm', 'Dikte mm',
     'Netto m3', 'Bruto m3', 'Materiaal', 'Tredenummer', 'Bovenkant mm',
     'Aantrede klimlijn mm', 'Tredevlak klimlijn mm', 'Kortste zijmaat langs wang mm', 'Contouroppervlak mm2'];
   if (geometry.housings) header.push('Insteeklippen', 'Infrezingen', 'Insteekdiepte mm');
   if (geometry.riserJoinery) header.push('Stootbordgroeven', 'Groefdiepte stootbord mm');
   if (hasProfiles) header.push('Neusprofiel','Profielmaat mm','Lengte voorrand mm','Volumevermindering neus cm3');
+  if (hasNewels) header.push('Spilaansluiting', 'Insteek in spil mm', 'Tredehuizen in spil');
   return [[...header, ...extraHeader], ...geometry.parts.map(p => [
     p.id, p.name, p.quantity, mm(p.length), mm(p.width), mm(p.thickness),
     p.volume.toFixed(8), p.blankVolume.toFixed(8), material, p.level ?? '', mm(p.elevation),
     mm(p.goingAtWalkline), mm(p.depthAtWalkline), mm(p.narrowDepth), mm(p.area),
-    ...(geometry.housings ? [p.tongueCount ?? '', p.pocketCount ?? '', p.kind === 'landing' ? '' : mm(geometry.housings.settings.depth)] : []),
+    ...(geometry.housings ? [p.tongueCount ?? '', p.kind==='quarterNewel'?'':p.pocketCount ?? '', ['landing','quarterNewel'].includes(p.kind) ? '' : mm(geometry.housings.settings.depth)] : []),
     ...(geometry.riserJoinery ? [p.riserPockets?.length ?? '', mm(p.riserPockets?.[0]?.depth)] : []),
     ...(hasProfiles ? (p.noseDetail?[p.noseDetail.kind==='round'?'Kwartrond bovenrand':'Velling 45° bovenrand',p.noseDetail.sizeMm,
       mm(p.noseDetail.frontLengthMm),mm(p.noseDetail.removedMm3/1000)]:['','','','']) : []),
+    ...(hasNewels ? [(p.newelJoints ?? []).map(j=>j.postId).join(' / '),
+      (p.newelJoints ?? []).map(j=>mm(j.depth)).join(' / '),p.kind==='quarterNewel'?p.pocketCount:''] : []),
     ...stockFields(p.kind === 'tread' ? p : null)
   ])];
 }

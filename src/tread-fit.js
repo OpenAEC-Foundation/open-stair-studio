@@ -1,4 +1,5 @@
 import { compileHousingJob } from './housing-cam.js';
+import polygonClipping from 'polygon-clipping';
 
 // The posts write XY and Z to 0.0001 mm. This tolerance only absorbs NC rounding.
 const ncTolerance = 0.001;
@@ -105,8 +106,47 @@ function checkConnection(part, tongue, beam, housingCam, job, cutterPath) {
   return { edgeClearance: Math.max(0, edgeClearance), depthClearance: Math.max(0, depthClearance) };
 }
 
+// The fixture origin is on the oversize blank. Rebuild the machined board's
+// nominal world-space footprint and test it against the solid post at this
+// level, including the material removed by its finished mortise.
+function checkNewel(part, post, job, cutterPath) {
+  if(!post || !part.boardFrame) throw new Error('De spil of het planknulpunt ontbreekt.');
+  const frame=part.boardFrame,radius=job.parameters.toolDiameter/2;
+  const world=job.contour.map(q=>{
+    const p=sub(q,job.offset);
+    return {x:frame.origin.x+frame.xAxis.x*p.x+frame.yAxis.x*p.y,
+      y:frame.origin.y+frame.xAxis.y*p.x+frame.yAxis.y*p.y};
+  });
+  const ring=points=>points.map(p=>[nc(p.x),nc(p.y)]);
+  const blank=[ring(post.points)];
+  if(part.elevation<=post.lowerZ || part.elevation-part.thickness>=post.upperZ ||
+      !edges(world).some(([a,b])=>edges(post.points).some(([c,d])=>segmentGap(a,b,c,d)<=ncTolerance))) {
+    throw new Error('De trede bereikt het aansluitvlak van de spil niet.');
+  }
+  const pockets=post.pockets.filter(p=>p.treadId===part.id);
+  const edgeGaps=pockets.flatMap(p=>[part.elevation-part.thickness-p.lowerZ,p.upperZ-part.elevation]);
+  if(edgeGaps.some(gap=>gap< -ncTolerance)) throw new Error('Het spilhuis omvat de trededikte niet.');
+  const solid=pockets.length?polygonClipping.difference(blank,...pockets.map(p=>[ring(p.points)])):blank;
+  const overlap=polygonClipping.intersection([ring(world)],solid);
+  // Intersection areas below a rounding strip one NC increment wide are noise.
+  for(const [outer] of overlap) {
+    const twiceArea=outer.reduce((sum,[x,y],i)=>{const q=outer[(i+1)%outer.length]; return sum+x*q[1]-q[0]*y;},0);
+    if(Math.abs(twiceArea)/2>.0002*(post.xMax-post.xMin+post.yMax-post.yMin)) throw new Error('De tredecontour doorsnijdt de spil naast het tredehuis.');
+  }
+  // A butt notch or housed shoulder can be concave. An uncompensated
+  // internal radius leaves solid timber at the sharp mating corner.
+  for(const [i,p] of world.entries()) {
+    if(p.x<post.xMin-ncTolerance||p.x>post.xMax+ncTolerance||p.y<post.yMin-ncTolerance||p.y>post.yMax+ncTolerance)continue;
+    const current=job.contour[i],previous=job.contour[(i+world.length-1)%world.length],next=job.contour[(i+1)%world.length];
+    if(cross(sub(current,previous),sub(next,current))>=-ncTolerance)continue;
+    if(!cutterPath.some(([a,b])=>segmentDistance(current,a,b)<=radius+ncTolerance)) throw new Error('Resthout in de binnenhoek van de trede raakt de spil.');
+  }
+  return {postId:post.id,edgeClearance:edgeGaps.length?Math.min(...edgeGaps):null,requiresFinishing:pockets.length>0};
+}
+
 export function verifyTreadFit(part, workshop, housingCam, job) {
   const connections = [];
+  const newels=[];
   const beamIds = new Set(part.tongues.map(tongue => tongue.beamId));
   const flight = workshop.treads.find(t => t.id === part.id)?.flightIndex;
   const requiredSides = new Set((workshop.housings?.beams ?? [])
@@ -124,6 +164,11 @@ export function verifyTreadFit(part, workshop, housingCam, job) {
   } else {
     const path = job.path.map(asWritten);
     const cutterPath = path.slice(1).map((p, i) => [path[i], p]);
+    for (const joint of part.newelJoints??[]) {
+      try {
+        newels.push(checkNewel(part,workshop.newels?.find(p=>p.id===joint.postId),job,cutterPath));
+      } catch(error) { issues.push(joint.postId+' · '+error.message); }
+    }
     for (const tongue of part.tongues) {
       const link = { pocketId: tongue.pocketId, beamId: tongue.beamId };
       const beam = workshop.housings?.beams.find(b => b.id === link.beamId);
@@ -136,7 +181,8 @@ export function verifyTreadFit(part, workshop, housingCam, job) {
       }
     }
   }
-  const status = issues.length ? 'blocked' : connections.length ? 'pass' : 'unconnected';
-  const message = issues[0] ?? (connections.length ? 'Alle lippen passen volgens de berekende freesbanen.' : 'Losse trede zonder gekoppelde wanghuizen.');
-  return { status, connections, message, issues };
+  const status = issues.length ? 'blocked' : connections.length || newels.length ? 'pass' : 'unconnected';
+  const message = issues[0] ?? (newels.length?'Spilaansluiting en hoekvrijheid van de trede gecontroleerd.':
+    connections.length ? 'Alle lippen passen volgens de berekende freesbanen.' : 'Losse trede zonder gekoppelde wanghuizen.');
+  return { status, connections, newels, message, issues };
 }

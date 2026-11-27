@@ -3,6 +3,7 @@
   import TimberProfileDrawing from './TimberProfileDrawing.svelte';
   import RiserGrooveSheet from './RiserGrooveSheet.svelte';
   import RiserBoardCamSheet from './RiserBoardCamSheet.svelte';
+  import NewelCamSheet from './NewelCamSheet.svelte';
   import { riserFaceResults } from './riser-face-cam.js';
   import { groupNames, mm, stockText, timberSheetParts, timberViews, timberDetailDxf } from './timber-sheet.js';
   export let model, geometry, details, downloadFile, updateRiserCam, updateRiserDetailCam;
@@ -76,6 +77,10 @@
         {#if Number.isFinite(part.radiusMm)}<div><dt>Hartlijnradius</dt><dd>{mm(part.radiusMm)} mm</dd></div>{/if}
         {#if Number.isFinite(part.bendAngleDeg)}<div><dt>Booghoek</dt><dd>{mm(part.bendAngleDeg)}°</dd></div>{/if}
       </dl>
+      {#if part.newelJoints?.length}
+        <p><b>Spilaansluitingen</b> {part.newelJoints.map(j=>j.postId+' · '+(j.depth>0?mm(j.depth)+' mm insteek':'stuikend')).join(' / ')}</p>
+      {/if}
+      {#if row.type==='quarterNewel'}<NewelCamSheet post={part} {model} {downloadFile}/>{/if}
       <div class="drawings">{#each views as view,i}<TimberProfileDrawing {view}
         roundDiameter={i===1 && stations[currentStation]?.section==='rond' ? stations[currentStation].widthMm : null}/>{/each}</div>
       <RiserGrooveSheet results={grooveResults} {model} {downloadFile}/>
@@ -143,6 +148,7 @@
     .timber-shop{display:block;overflow:visible;background:white;}.paper{padding:0;margin:0;max-width:none;font-size:8.5pt;print-color-adjust:exact;}
     .sheet-title{padding-bottom:1.5mm;}h2{font-size:15pt;}h3{font-size:10pt;}header p,.metrics dt{font-size:8pt;}
     .drawings{grid-template-columns:1fr 1fr;gap:3mm;}.metrics{margin:2mm 0 3mm;}p{margin:1.4mm 0;}
+    .drawings :global(figure){break-inside:avoid;}
     .stations{grid-template-columns:repeat(3,1fr);gap:3mm;}td,th{padding:.6mm 1.1mm;font-size:8pt;}
     .calibration{display:flex;align-items:baseline;gap:2mm;font-size:7.5pt;color:#425860;margin-top:2mm;}
     .gauge{display:inline-block;width:50mm;height:2mm;border:solid #34484e;border-width:0 .2mm .2mm;box-sizing:border-box;}

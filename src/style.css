@@ -46,6 +46,7 @@
 .empty-tree-note{padding:10px 16px 10px 31px;color:var(--oa-text-muted);font-size:10px}.empty-project{max-width:760px;margin:40px auto;text-align:center}.empty-project h1{margin:8px 0 6px}.empty-project p{color:var(--oa-text-secondary)}.empty-project-choices{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:22px 0}.empty-project-choices .action-btn{min-width:195px}
 
 .plan-stringer{fill:#cdbb99;fill-opacity:.58;stroke:#806a49;stroke-width:10}
+.plan-newel{fill:#ac8654;stroke:#514432;stroke-width:3}
 
 .print-heading { display: none; }
 .tread-picker { display: flex; align-items: center; gap: 10px; padding: 6px 16px; border-bottom: 1px solid var(--oa-border); background: var(--oa-panel); font-size: 11px; }
