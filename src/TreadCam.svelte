@@ -4,6 +4,8 @@
     writeTreadCamJson, writeTreadLinuxCnc
   } from './tread-cam.js';
   import { verifyTreadFit } from './tread-fit.js';
+  import RiserGrooveSheet from './RiserGrooveSheet.svelte';
+  import { riserFaceResults } from './riser-face-cam.js';
 
   export let part;
   export let model;
@@ -79,7 +81,8 @@
   $: fit = job ? verifyTreadFit(part, workshop, model.cam, job) : null;
   $: setupIssues = (fit?.issues ?? []).map(issueText).filter(message =>
     !fit.connections.some(c => c.status === 'blocked' && message === c.beamId + ' · ' + c.message));
-  $: exportable = !!job && (fit?.status === 'pass' || fit?.status === 'unconnected');
+  $: grooveResults = riserFaceResults(part,model,workshop.riserJoinery?.issues);
+  $: exportable = !!job && !grooveResults.some(r=>r.problem) && (fit?.status === 'pass' || fit?.status === 'unconnected');
   $: tongue = job?.tongues.find(t => t.pocketId === focusedPocket);
   $: shoulder = job?.reliefs.find(relief => tongue ? relief.pocketId === tongue.pocketId : relief.pocketId);
   $: detailTongue = job?.tongues.find(t => t.pocketId === shoulder?.pocketId);
@@ -204,6 +207,7 @@
     <p>Frees op een offerplaat met een centrumsnijdende frees. Houd trede en resthout afzonderlijk vast met vacuüm tijdens de doorlopende laatste gang. Stel G54 in met het gemonteerde gereedschap, zonder lengtecorrectie of extra G52/G92-verschuiving.</p>
   </section>
 
+  <RiserGrooveSheet results={grooveResults} {model} {downloadFile}/>
   <div class="exports">
     <button class="action-btn primary" disabled={!exportable} onclick={() => exportProgram('ngc')}>Tredeprogramma (.ngc)</button>
     <button class="action-btn" disabled={!exportable} onclick={() => exportProgram('json')}>Trede-CAM (.json)</button>

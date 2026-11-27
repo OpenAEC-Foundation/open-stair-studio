@@ -12,7 +12,7 @@ const systemValues = engineering => Object.fromEntries(systemFields.map(key => [
 const ranges = {
   ...Object.fromEntries(timberDimensions.map(f=>[f.key,[f.min,f.max]])), noseSize:[0.5,25],wellatWidth:[3,35],wellatHeight:[5,45],
   railHeight:[650,1350], riserThickness:[8,42], riserTopInset:[0,80], riserBottomInset:[8,100],
-  depth: [0.1, 150], clearance: [0, 10], endMargin: [0, 300],
+  depth: [0.1, 150], clearance: [0, 10], endMargin: [0, 300], riserGrooveDepth: [1, 30],
   floorHeight: [100, 10000], width: [300, 3000], going: [100, 600], risers: [2, 40],
   originX: [-1000000000, 1000000000], originY: [-1000000000, 1000000000], originZ: [-1000000000, 1000000000],
   originRotationDeg: [-360, 360],
@@ -26,7 +26,7 @@ const ranges = {
 };
 const labels = {
   ...Object.fromEntries(timberDimensions.map(f=>[f.key,f.label])), noseSize:'Profielmaat tredeneus',
-  depth: 'Insteekdiepte', clearance: 'Totale passpeling', endMargin: 'Schoudermaat',
+  depth: 'Insteekdiepte', clearance: 'Totale passpeling', endMargin: 'Schoudermaat', riserGrooveDepth: 'Groefdiepte stootbord',
   floorHeight: 'Vloerhoogte', width: 'Trapbreedte', going: 'Aantrede', risers: 'Aantal optredes',
   originX: 'Projectnulpunt X', originY: 'Projectnulpunt Y', originZ: 'Projectnulpunt Z',
   originRotationDeg: 'Rotatie projectassen',
@@ -62,6 +62,7 @@ function readField(section, key, value) {
   if (section==='stair' && key==='wellatType' && !['none','chamfered'].includes(value)) throw new Error('Onbekende wellat.');
   if (section==='stair' && key==='railSide' && !['none','left','right','both'].includes(value)) throw new Error('Kies de zijde van de leuning.');
   if (section==='stair' && key==='riserBoards' && !['none','closed'].includes(value)) throw new Error('Kies open treden of stootborden.');
+  if (section==='stair' && key==='riserJoint' && !['butt','housed'].includes(value)) throw new Error('Onbekende stootbordverbinding.');
   if (section==='stair' && key==='riserPosition' && !['auto','manual'].includes(value)) throw new Error('Kies automatische of handmatige stootbordpositie.');
   if (section==='stair' && ['stringerLeft','stringerRight'].includes(key) && !['housed','cut'].includes(value)) throw new Error('Kies een ingekroosde boom of een keepboom.');
   if (section === 'joinery' && key === 'type' && !['none', 'housed'].includes(value)) throw new Error('Onbekende tredeverbinding.');
@@ -153,7 +154,9 @@ export function editSession(session, section, key, value) {
   if (section === 'stair' && key === 'type') model.stairEnabled = true;
   if(section==='stair'&&key==='type'&&['quarter_winder','half_winder'].includes(value)){
     model.stair.stringerLeft='housed';model.stair.stringerRight='housed';
+    model.stair.riserJoint='butt';
   }
+  if(section==='stair'&&key==='riserPosition'&&value==='manual') model.stair.riserJoint='butt';
   // Surveyed widths refer to a particular stair layout. Undo restores both
   // the geometry and the measurements for that layout together.
   if (section === 'stair' && ['width', 'stringerThickness', 'stringerLeft','stringerRight','stringerOverhang','type', 'turnDirection', 'outerShape', 'laneGap', 'going', 'risers', 'windersPerQuarter', 'entrySteps', 'nosing', 'landingLength','landingRiser'].includes(key)) {

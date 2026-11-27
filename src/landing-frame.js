@@ -6,7 +6,13 @@ const rectangle = (x0, y0, x1, y1) => [
 
 export function buildLandingFrame(landing, stair) {
   if (stair.landingFrame !== 'perimeter') return {members:[], joints:[], fasteners:[]};
-  const minX = Math.min(...landing.points.map(p=>p.x));
+  const plateMinX = Math.min(...landing.points.map(p=>p.x));
+  // The incoming flight of each straight/quarter/return landing climbs in
+  // +X. Carry the two side rails and the front cross member behind the riser
+  // as one rectangular frame, so the same butt joints and screws still fit.
+  const housedRiser = stair.riserJoint==='housed' && stair.riserBoards==='closed' && stair.riserPosition!=='manual';
+  const riserBack = (landing.level-1)*Number(stair.going)-(Number(stair.nosing)||0)+Number(stair.riserThickness);
+  const minX = housedRiser ? Math.max(plateMinX,riserBack) : plateMinX;
   const maxX = Math.max(...landing.points.map(p=>p.x));
   const minY = Math.min(...landing.points.map(p=>p.y));
   const maxY = Math.max(...landing.points.map(p=>p.y));

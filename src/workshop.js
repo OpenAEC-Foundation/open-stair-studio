@@ -2,6 +2,8 @@ import { buildHousings } from './housings.js';
 import { buildWinderSchedule, treadPart } from './winder-parts.js';
 import { profileTimberTread } from './timber-tread-profile.js';
 import {cutStringerJob} from './cut-stringer.js';
+import { buildStairDetails } from './stair-details.js';
+import { buildRiserJoinery } from './riser-joinery.js';
 
 // Older straight-flight projects keep their grouped cutting list. Their individual
 // pieces can still be opened in the workshop and machined without a housed joint.
@@ -31,13 +33,24 @@ function pocketVolume(pocket) {
   return Math.abs(twiceArea) * pocket.depth / 2e9;
 }
 
-export function buildWorkshop(geometry, model) {
+export function buildWorkshop(geometry, model, designDetails) {
   if (model.engineering && model.engineering.structureType !== 'timber') return geometry;
   const housed=model.joinery.type!=='none';
+  const housedRisers=model.stair.riserBoards==='closed' && model.stair.riserJoint==='housed';
   const cutBeams=geometry.stringers.filter(beam=>beam.profile==='cut');
-  if(!housed&&!cutBeams.length&&!['round','bevel'].includes(model.stair.noseProfile)) return geometry;
-  const housings = housed?buildHousings(geometry, model.joinery):cutBeams.length?
+  if(!housed&&!housedRisers&&!cutBeams.length&&!['round','bevel'].includes(model.stair.noseProfile)) return geometry;
+  const housings = housed || housedRisers ? buildHousings(geometry, model.joinery, housed) : cutBeams.length?
     {settings:model.joinery,beams:cutBeams.map(cutStringerJob),treads:geometry.treads,issues:[]}:null;
+  const riserJoinery = housedRisers ? buildRiserJoinery(geometry, model.stair, housings,
+    designDetails ?? buildStairDetails(model.stair,geometry)) : null;
+  const byHost = Map.groupBy(riserJoinery?.pockets ?? [], pocket => pocket.hostId);
+  const byRiser = Map.groupBy(riserJoinery?.pockets ?? [], pocket => pocket.riserId);
+  for (const beam of housings?.beams ?? []) {
+    for (const pocket of byHost.get(beam.id) ?? []) {
+      beam.pockets.push({...pocket, beamId:beam.id, treadId:pocket.riserId});
+    }
+    if (riserJoinery) beam.issues.push(...riserJoinery.issues.filter(i=>i.level==='error'));
+  }
   const treads = (housings?.treads??geometry.treads).map(tread => ({
     ...profileTimberTread(tread,model.stair),
     goingAtWalkline: tread.goingAtWalkline ?? model.stair.going,
@@ -64,6 +77,20 @@ export function buildWorkshop(geometry, model) {
     schedule.parts.push({...member,quantity:1,blankVolume:member.volume});
     schedule.volume += member.volume;
     schedule.blankVolume += member.volume;
+  }
+  if (riserJoinery) {
+    for (const part of schedule.parts) {
+      const pockets = byHost.get(part.id);
+      if (!pockets) continue;
+      part.riserPockets = pockets;
+      if (part.kind === 'stringer') continue; // Its total includes every pocket on the inside face.
+      const removed = pockets.reduce((sum,p) => sum+p.volumeM3,0);
+      part.volume -= removed;
+      schedule.volume -= removed;
+    }
+    const detailParts = riserJoinery.parts.map(part => byRiser.has(part.id)
+      ? {...part, riserPockets:byRiser.get(part.id)} : part);
+    return {...geometry,...schedule,treads,housings,riserJoinery,detailParts};
   }
   return { ...geometry, ...schedule, ...(housings?{housings}:{}),
     ...(['round','bevel'].includes(model.stair.noseProfile)?{treads}:{}) };

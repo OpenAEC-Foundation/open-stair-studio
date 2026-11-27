@@ -1,6 +1,6 @@
 import { prism, tube } from './components/solids.js';
 import { treadClearanceIssue } from './stair-validity.js';
-import { nosingStrip, riserStock } from './timber-riser.js';
+import { housedStraightRisers, nosingStrip, riserStock } from './timber-riser.js';
 import { buildTimberBalustrade } from './timber-balustrade.js';
 
 export const detailDefaults = { railSide:'none', railHeight:950, riserBoards:'none', riserThickness:18,
@@ -226,7 +226,7 @@ function riserParts(stair,geometry) {
   for(const flight of geometry.flights) {
     const treads=geometry.treads.filter(t=>t.flightIndex===flight.index);
     for(const t of treads) {
-      const offset=Math.max(0,stair.nosing-stair.riserThickness);
+      const offset=housedStraightRisers(stair)?stair.wellatWidth:Math.max(0,stair.nosing-stair.riserThickness);
       if(geometry.dimensions.family.winder){
         const footprint=strip(t.points,t.frontEdge[0],t.direction,0,stair.riserThickness);
         add(t.id+'-SB',footprint,t.elevation-rise,t.elevation-t.thickness,t.direction);

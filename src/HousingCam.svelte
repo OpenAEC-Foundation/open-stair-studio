@@ -71,7 +71,7 @@
         modelFrame:setup.frame, stock:{length:setup.length,width:setup.width,thickness:setup.thickness},
         outline:setup.outline, parameters,
         operations:result.job.operations.map(op=>({
-          id:op.id, type:'pocket', tread:op.treadId, contour:op.loop.points,
+          id:op.id, type:'pocket', ...(op.riserId?{riser:op.riserId}:{tread:op.treadId}), contour:op.loop.points,
           depth:op.depth, zLevels:op.levels, offsetContour:op.ring, cornerReliefCentres:op.relief,
           rasterToolCentres:op.raster
         }))
@@ -82,7 +82,7 @@
 </script>
 
 <div class="production-view housing-cam">
-  <div class="production-head"><div><span class="eyebrow">CNC · WANGBEWERKING</span><h1>Tredehuizen frezen</h1><p>LinuxCNC · 3 assen · één binnenvlak per opspanning</p></div></div>
+  <div class="production-head"><div><span class="eyebrow">CNC · WANGBEWERKING</span><h1>{setup?.pockets.some(p=>p.riserId)?'Trede- en stootbordhuizen frezen':'Tredehuizen frezen'}</h1><p>LinuxCNC · 3 assen · één binnenvlak per opspanning</p></div></div>
   {#if setup}
     <div class="setup">
       <label for="cam-beam">Wang op de machine</label>
@@ -97,7 +97,7 @@
           value={parameters[key]} onchange={e=>changeSetting(key,e)} /></label>
       {/each}
     </div>
-    <label for="corner-mode">Binnenhoeken</label>
+    <label for="corner-mode">Binnenhoeken tredehuizen</label>
     <select id="corner-mode" value={parameters.cornerMode} onchange={e=>changeSetting('cornerMode',e)}>
       <option value="dogbone">Dogbone · hoekontlasting voor rechte trede-lip</option>
       <option value="rounded">Rond · nabeitelen of hoeken van de lip afronden</option>

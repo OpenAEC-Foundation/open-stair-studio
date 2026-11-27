@@ -1,11 +1,15 @@
 <script>
   import { createLandingFrameDxf } from './landing-frame-dxf.js';
   import { checkLandingJoints } from './landing-joint-check.js';
+  import RiserGrooveSheet from './RiserGrooveSheet.svelte';
+  import { riserFaceResults } from './riser-face-cam.js';
   export let geometry;
+  export let workshop;
   export let model;
   export let downloadFile;
   const format=n=>Number(n).toLocaleString('nl-NL',{maximumFractionDigits:1});
   $: landing=geometry.landings[0];
+  $: grooveResults=riserFaceResults(workshop.parts.find(p=>p.kind==='landing' && p.id===landing?.id),model,workshop.riserJoinery?.issues);
   $: members=geometry.landingFrame??[];
   $: joints=geometry.landingJoints??[];
   $: fasteners=geometry.landingFasteners??[];
@@ -23,8 +27,9 @@
 
 <div class="production-view">
   <div class="production-head"><div><span class="eyebrow">WERKPLAATS · BORDES</span><h1>Bordesraam en aansluitingen</h1><p>{model.stair.mark} · revisie {model.project.revision} · maten in mm</p></div>
-    {#if members.length}<div class="button-row"><button class="action-btn" onclick={exportDxf}>DXF · 1:1</button><button class="action-btn" onclick={()=>window.print()}>PDF / afdrukken</button></div>{/if}
+    {#if members.length||grooveResults.length}<div class="button-row">{#if members.length}<button class="action-btn" onclick={exportDxf}>DXF · 1:1</button>{/if}<button class="action-btn" onclick={()=>window.print()}>PDF / afdrukken</button></div>{/if}
   </div>
+  <RiserGrooveSheet results={grooveResults} {model} {downloadFile}/>
   {#if !landing}<p>Deze trap heeft geen tussenbordes.</p>
   {:else if !members.length}<p>Schakel het houten bordesraam in bij de trapgeometrie.</p>
   {:else}

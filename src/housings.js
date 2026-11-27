@@ -143,7 +143,7 @@ function pocketConflict(one,two,along) {
   return true;
 }
 
-export function buildHousings(geometry, input = {}) {
+export function buildHousings(geometry, input = {}, includeTreadJoints = true) {
   const settings={...defaultHousingSettings,...input};
   const validBeam=beam => [beam.length,beam.width,beam.thickness].every(value=>Number.isFinite(value)&&value>EPS);
   const setups=geometry.stringers.filter(validBeam).map(beam=>beam.profile==='cut'?{job:cutStringerJob(beam)}:setupBeam(beam));
@@ -167,6 +167,7 @@ export function buildHousings(geometry, input = {}) {
   for (const job of beams) if (job.profile!=='cut'&&settings.depth >= job.thickness-EPS) {
     issue('De ingestelde diepte laat geen hout achter het huis in '+job.id+'.','through', [job]);
   }
+  if (!includeTreadJoints) return {settings,beams,treads:geometry.treads,issues};
   for (const tread of geometry.treads) {
     const points=[],tongues=[];
     const relevant=setups.filter(s=>s.job.flightIndex===tread.flightIndex&&s.job.profile!=='cut');

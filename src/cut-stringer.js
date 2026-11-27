@@ -1,5 +1,6 @@
 import earcut from 'earcut';
 import Drawing from 'dxf-writer';
+import { housedStraightRisers } from './timber-riser.js';
 
 const round=n=>Number(n.toFixed(3));
 const area=points=>Math.abs(points.reduce((sum,p,i)=>{
@@ -15,20 +16,22 @@ export function makeCutStringer(stair,flight,side,normal,rise) {
   const thickness=Number(stair.stringerThickness), depth=Number(stair.stringerDepth);
   const nose=Number(stair.nosing)||0;
   const entry=flight.index>0?1:0;
+  const rearSeat=housedStraightRisers(stair)?Number(stair.riserThickness):0;
   const startX=entry?-going:-nose;
   const top=[];
   if(entry){
     const landingZ=flight.firstRiser*rise-Number(stair.landingThickness||treadThickness);
-    top.push({x:startX,z:landingZ},{x:-nose,z:landingZ});
+    top.push({x:startX,z:landingZ},{x:-nose+rearSeat,z:landingZ});
   }
   for(let step=0;step<flight.treadCount;step++){
     const z=(flight.firstRiser+step+1)*rise-treadThickness;
-    top.push({x:step*going-nose,z},{x:(step+1)*going-nose,z});
+    const seatStart=step===0 && !entry ? startX : step*going-nose+rearSeat;
+    top.push({x:seatStart,z},{x:(step+1)*going-nose+rearSeat,z});
   }
   const compact=top.filter((p,i)=>i===0||p.x!==top[i-1].x||p.z!==top[i-1].z);
   const slope=rise/going;
   const intercept=Math.min(...compact.map(p=>p.z-slope*(p.x-startX)))-depth;
-  const endX=flight.treadCount*going-nose;
+  const endX=flight.treadCount*going-nose+rearSeat;
   const bottomAt=x=>intercept+slope*(x-startX);
   const section=[...compact,{x:endX,z:bottomAt(endX)},{x:startX,z:bottomAt(startX)}];
   const sectionArea=area(section);

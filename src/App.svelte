@@ -39,7 +39,7 @@
 
   function freshDesign() {
     const project=structuredClone(starterProject);
-    Object.assign(project.stair,newDesignDetails,{timberDetail:'modern',noseProfile:'round',railSide:'none'});
+    Object.assign(project.stair,newDesignDetails,{timberDetail:'modern',noseProfile:'round',railSide:'none',riserJoint:'housed'});
     return project;
   }
   let model = freshDesign();
@@ -183,23 +183,28 @@
   // Project edits replace only the affected section. Keep the GPU scene alive
   // while a user edits loads, costs or other project metadata.
   const geometryByStair = new WeakMap();
-  function geometryFor(stair) {
-    if (!geometryByStair.has(stair)) geometryByStair.set(stair, generateStairGeometry(stair, { projectIsometric: false }));
-    return geometryByStair.get(stair);
+  const referenceByStair = new WeakMap();
+  function geometryFor(stair, timber) {
+    const cache=timber?geometryByStair:referenceByStair;
+    if (!cache.has(stair)) cache.set(stair, generateStairGeometry(timber?stair:{...stair,riserJoint:'butt'}, { projectIsometric: false }));
+    return cache.get(stair);
   }
-  $: geometry = geometryFor(model.stair);
+  $: geometry = geometryFor(model.stair,timberSystem);
   $: designChecks = inspectStair(model, geometry);
   $: invalidGeometry = designChecks.find(item => item.level === 'error' && item.reference === 'Geometrische invoer');
   $: timberSystem = model.engineering.structureType === 'timber';
-  $: details = timberSystem && !invalidGeometry ? buildStairDetails(model.stair,geometry) : [];
-  $: baseWorkshop = invalidGeometry ? geometry : buildWorkshop(geometry,model);
+  $: designDetails = timberSystem && !invalidGeometry ? buildStairDetails(model.stair,geometry) : [];
+  $: baseWorkshop = invalidGeometry ? geometry : buildWorkshop(geometry,model,designDetails);
+  $: details = baseWorkshop.detailParts ?? designDetails;
   $: workshop = timberSystem && !invalidGeometry ? addTimberTakeoff(baseWorkshop,model.stair,details) : baseWorkshop;
-  $: housingIssues = workshop.housings?.issues ?? [];
+  $: housingIssues = [...(workshop.housings?.issues ?? []), ...(workshop.riserJoinery?.issues ?? [])];
   let woodView='all';
-  $: visibleWood=timberSystem && !invalidGeometry && (model.stair.timberDetail!=='basic'||model.stair.wellatType==='chamfered');
+  $: visibleWood=timberSystem && !invalidGeometry && (model.stair.timberDetail!=='basic'||model.stair.wellatType==='chamfered'||!!workshop.riserJoinery);
   $: isolated=visibleWood?woodView:'all';
   $: sceneGeometry = isolated==='rail'&&details.some(p=>p.kind==='railing')?{componentParts:details.filter(p=>p.kind==='railing'||p.role==='newel'||p.role==='baluster'),viewDirection:geometry.treads[0]?.direction}:
-    {...geometry,treads:timberSystem?workshop.treads:geometry.treads,componentParts:isolated==='boards'?details.filter(p=>p.role==='riser'||p.role==='nosingStrip'):[...details,...(timberSystem?[...(geometry.landingFrame??[]),...(geometry.landingFasteners??[])]:[])],
+    {...geometry,housings:workshop.housings,riserJoinery:workshop.riserJoinery,
+    treads:isolated==='boards'?[]:timberSystem?workshop.treads:geometry.treads,landings:isolated==='boards'?[]:geometry.landings,
+    componentParts:isolated==='boards'?details.filter(p=>p.role==='riser'||p.role==='nosingStrip'):[...details,...(timberSystem?[...(geometry.landingFrame??[]),...(geometry.landingFasteners??[])]:[])],
     stringers:isolated==='boards'?[]:geometry.stringers};
   $: materialLabel = timberSystem ? model.stair.material : structureTypes.find(type => type.id === model.engineering.structureType)?.label;
   $: referenceRows = timberSystem ? [] : referenceTreadRows(geometry);
@@ -365,7 +370,7 @@
     if (!model.stairEnabled) return notify('Kies eerst een traptype.');
     if (invalidGeometry) return notify(invalidGeometry.detail);
     const exportModel = model;
-    const exportGeometry = {...geometry,detailParts:details};
+    const exportGeometry = {...(workshop.riserJoinery ? workshop : geometry),detailParts:details};
     try {
       const { createIfc4 } = await import('./ifc-export.js');
       const result = await createIfc4(exportModel, exportGeometry);
@@ -605,7 +610,7 @@
       {:else if activeView === 'Onderdelen'}
         <div class="production-view"><div class="production-head"><div><span class="eyebrow">WERKVOORBEREIDING · CONCEPT</span><h1>{sheetMode === 'detail' ? 'Tredeblad' : 'Onderdelenstaat'}</h1><p>Afgeleid van de huidige geometrie · {model.stair.mark} · revisie {model.project.revision}</p></div><div class="button-row"><button class="action-btn" onclick={exportPartsCsv}>CSV</button><button class="action-btn" onclick={printPdf}><Icon name="file.export" /> PDF / afdrukken</button></div></div><div class="production-summary"><div><span>Traptype</span><b>{dimensions.family.label}</b></div><div><span>Houtsoort</span><b>{model.stair.material}</b></div><div><span>Vloerhoogte</span><b>{model.stair.floorHeight} mm</b></div><div><span>Netto houtvolume</span><b>{workshop.volume.toFixed(3)} m³</b></div></div>
           {#if hasTreadSheets || sheetMode === 'detail'}
-            <WinderSchedule geometry={hasTreadSheets ? workshop : { ...workshop, parts: treadParts }} stockMargin={model.treadCam.stockMargin} {housingIssues} {downloadFile} {openHousing} {openTreadCam} bind:selectedId={selectedTreadId} bind:mode={sheetMode} />
+            <WinderSchedule geometry={hasTreadSheets ? workshop : { ...workshop, parts: treadParts }} {model} stockMargin={model.treadCam.stockMargin} {housingIssues} {downloadFile} {openHousing} {openTreadCam} bind:selectedId={selectedTreadId} bind:mode={sheetMode} />
           {:else}
             <button class="action-btn" onclick={() => openTread(selectedPart.id)}>Tredeblad</button>
           <table class="parts-table"><thead><tr><th>Merk</th><th>Onderdeel</th><th>Aantal</th><th>Lengte mm</th><th>Breedte mm</th><th>Dikte mm</th><th>Volume m³</th><th>Status</th></tr></thead><tbody>{#each geometry.parts as part}<tr><td>{part.id}</td><td>{part.name}</td><td>{part.quantity}</td><td>{Math.round(part.length)}</td><td>{Math.round(part.width)}</td><td>{Math.round(part.thickness)}</td><td>{part.volume.toFixed(3)}</td><td>Referentiemaat</td></tr>{/each}</tbody></table>
@@ -632,7 +637,7 @@
           <div class="production-view"><h1>Tredecontour ontbreekt</h1><p>{housingIssues[0]?.message ?? 'Controleer de trapgeometrie.'}</p></div>
         {/if}
       {:else if activeView === 'Bordesraam'}
-        <LandingFrameSheet {geometry} {model} {downloadFile} />
+        <LandingFrameSheet {geometry} {workshop} {model} {downloadFile} />
       {:else if activeView === 'Wangbladen' || activeView === 'CNC-machine'}
         {#if !workshop.housings}
           <div class="production-view"><h1>Tredeverbindingen uitwerken</h1><p>Dit project bevat de trapmaten zonder insteeklippen. Voeg infrezingen toe om de wangbladen, bijpassende tredecontouren en CNC-banen te berekenen.</p><button class="action-btn" onclick={() => updateJoinery('type', 'housed')}>Infrezingen toevoegen</button></div>
@@ -734,7 +739,7 @@
             <label for="family">Trapfamilie</label><select id="family" value={model.stair.type} onchange={e => chooseFamily(e.currentTarget.value)}>{#each stairFamilies as family}<option value={family.id}>{family.label}</option>{/each}<optgroup label="Trappen en ladders">{#each componentTypes as t}<option value={t.id}>{t.label}</option>{/each}</optgroup></select>
             <label for="tread-system">Tredesysteem</label><select id="tread-system" value={model.engineering.structureType} onchange={e => { updateEngineering('structureType', e.currentTarget.value); selectRibbon('Engineering'); }}>{#each structureTypes as type}<option value={type.id}>{type.label}</option>{/each}</select>
           </div>
-          {#if timberSystem && geometry.stringers.some(beam=>beam.profile!=='cut') && (activeView === 'Wangbladen' || activeView === 'CNC-machine')}<JoineryControls joinery={model.joinery} update={updateJoinery} />{/if}
+          {#if timberSystem && geometry.stringers.some(beam=>beam.profile!=='cut') && (activeView === 'Wangbladen' || activeView === 'CNC-machine')}<JoineryControls joinery={model.joinery} update={updateJoinery} riserGrooves={!!workshop.riserJoinery} />{/if}
           {#if dimensions.family.winder}<WinderControls stair={model.stair} {geometry} {update} showPlan={() => activeView = 'Plattegrond'} />{/if}
           <div class="property-section"><h3>Project en trap <span>⌃</span></h3><label for="project-name">Projectnaam</label><input class="text-field" id="project-name" value={model.project.name} oninput={e => updateRoot('project','name',e.currentTarget.value)} /><label for="project-number">Projectnummer</label><input class="text-field" id="project-number" value={model.project.number} oninput={e => updateRoot('project','number',e.currentTarget.value)} /><label for="project-revision">Revisie</label><input class="text-field" id="project-revision" value={model.project.revision} oninput={e => updateRoot('project','revision',e.currentTarget.value)} /><label for="project-client">Opdrachtgever</label><input class="text-field" id="project-client" value={model.project.client} oninput={e => updateRoot('project','client',e.currentTarget.value)} /><label for="project-location">Projectlocatie</label><input class="text-field" id="project-location" value={model.project.location} oninput={e => updateRoot('project','location',e.currentTarget.value)} /><label for="stair-mark">Trapmerk</label><input class="text-field" id="stair-mark" value={model.stair.mark} oninput={e => update('mark',e.currentTarget.value)} /><label for="stair-name">Trapomschrijving</label><input class="text-field" id="stair-name" value={model.stair.name} oninput={e => update('name',e.currentTarget.value)} /></div>
           <div class="property-section"><h3>Trapgeometrie <span>⌃</span></h3>
@@ -779,7 +784,7 @@
             <label for="stringer-thickness">Wangdikte</label><div class="numeric-input"><input id="stringer-thickness" type="number" min="20" max="150" step="5" value={model.stair.stringerThickness} onchange={e => update('stringerThickness',e.currentTarget)} /><span>mm</span></div><label for="nosing">Tredepositie langs de looplijn (+ naar voren, − naar achteren)</label><div class="numeric-input"><input id="nosing" type="number" min="-60" max="100" step="5" value={model.stair.nosing} onchange={e => update('nosing', e.currentTarget)} /><span>mm</span></div>
           </div>
           <div class="property-section"><label for="tread-thickness">Trededikte</label><div class="numeric-input"><input id="tread-thickness" type="number" min="10" step="1" value={model.stair.treadThickness} onchange={e => update('treadThickness', e.currentTarget)} /><span>mm</span></div></div>
-          {#if timberSystem}<StairDetailControls stair={model.stair} {update} issue={invalidGeometry}/>{/if}
+          {#if timberSystem}<StairDetailControls stair={model.stair} parts={details} {update} issue={invalidGeometry ?? (housingIssues[0] && {detail:housingIssues[0].message})}/>{/if}
           <div class="property-section">
             <h3>IFC-projectnulpunt <span>⌃</span></h3>
             <label for="bim-origin-x">X-coördinaat</label><div class="numeric-input"><input id="bim-origin-x" type="number" step="1" value={model.bim.originX} onchange={e => updateRoot('bim','originX',e.currentTarget)} /><span>mm</span></div>

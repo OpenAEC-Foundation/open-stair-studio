@@ -1,6 +1,8 @@
 <script>
   import { tick } from 'svelte';
   import TimberProfileDrawing from './TimberProfileDrawing.svelte';
+  import RiserGrooveSheet from './RiserGrooveSheet.svelte';
+  import { riserFaceResults } from './riser-face-cam.js';
   import { groupNames, mm, stockText, timberSheetParts, timberViews, timberDetailDxf } from './timber-sheet.js';
   export let model, geometry, details, downloadFile;
 
@@ -11,6 +13,7 @@
   $: candidates = rows.filter(r => r.type === type);
   $: row = candidates.find(r => r.id === requestedId) ?? candidates[0];
   $: part = row?.part;
+  $: grooveResults = row?.type==='tread'?riserFaceResults(part,model,geometry.riserJoinery?.issues):[];
   $: stations = part?.profileStations ?? [];
   $: currentStation = Math.min(selectedStation??Math.floor(stations.length/2), Math.max(0, stations.length - 1));
   $: views = row ? timberViews(row, currentStation) : [];
@@ -60,6 +63,17 @@
       </dl>
       <div class="drawings">{#each views as view,i}<TimberProfileDrawing {view}
         roundDiameter={i===1 && stations[currentStation]?.section==='rond' ? stations[currentStation].widthMm : null}/>{/each}</div>
+      <RiserGrooveSheet results={grooveResults} {model} {downloadFile}/>
+      {#if part.joineryFeatures?.length}
+        <h3>Insteeklippen stootbord</h3>
+        <p>Maten vanaf de rechte schouder van het stootbord. Meet in de breedte naar links bij oplopen, in de hoogte vanaf de voet en in de dikte vanaf de zichtzijde.</p>
+        <table><thead><tr><th>Ontvangend onderdeel</th><th>Insteek (mm)</th><th>Breedte van – tot (mm)</th><th>Hoogte van – tot (mm)</th><th>Dikte van – tot (mm)</th></tr></thead>
+        <tbody>{#each part.joineryFeatures as f}
+          {@const b=f.localTongueBox}
+          <tr><td>{f.hostId}</td><td>{mm(f.tongueDepth)}</td><td>{mm(b[2])} – {mm(b[3])}</td><td>{mm(b[4])} – {mm(b[5])}</td><td>{mm(b[0])} – {mm(b[1])}</td></tr>
+        {/each}</tbody></table>
+      {/if}
+      {#each part.jointNotes??[] as note}<p>{note}</p>{/each}
       {#if housingIssue}<p class="finding"><b>Tredeverbinding controleren.</b> {housingIssue.message}</p>{/if}
       {#if part.fabricationIssue}<p class="finding"><b>Aansluiting controleren.</b> {part.fabricationIssue}</p>{/if}
       {#if part.noseDetail}<p><b>Neusbewerking.</b> {part.noseDetail.operation}</p>{/if}

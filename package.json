@@ -1,7 +1,7 @@
 {
   "name": "open-stair-studio",
   "private": true,
-  "version": "0.13.16",
+  "version": "0.13.17",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -13,8 +13,9 @@
     "verify:trappenhuis": "node scripts/verify-loft.mjs && node scripts/verify-spiral.mjs && node scripts/verify-concrete.mjs && node scripts/verify-stair-details.mjs && node scripts/verify-stairwell.mjs && node scripts/verify-stairwell-ifc.mjs",
     "verify:prefab": "node scripts/verify-precast-detail.mjs && node scripts/verify-precast-engineering.mjs && node scripts/verify-precast-independent.mjs && node scripts/verify-precast-ifc.mjs && node scripts/verify-local-bars.mjs && node scripts/verify-element-lift.mjs && node scripts/verify-local-ifc.mjs",
     "verify:stair": "node scripts/verify-stair.mjs && node scripts/verify-landing-hand.mjs && node scripts/verify-bim-material.mjs && node scripts/verify-host-ifc.mjs && node scripts/verify-cut-stringer.mjs",
-    "verify": "node scripts/verify-geometry.mjs && node scripts/verify-winder.mjs && node scripts/verify-winder-parts.mjs && node scripts/verify-housings.mjs && node scripts/verify-workshop.mjs && node scripts/verify-housing-cam.mjs && node scripts/verify-tread-cam.mjs && node scripts/verify-tread-fit.mjs && node scripts/verify-project.mjs && node scripts/verify-profile.mjs && node scripts/verify-engineering.mjs && node scripts/verify-resistance.mjs && node scripts/verify-support-detail.mjs && node scripts/verify-escape-capacity.mjs && node scripts/verify-engineering-ifc.mjs && npm run verify:stair && npm run verify:trappenhuis && npm run verify:prefab && npm run verify:ontwerp",
-    "verify:ontwerp": "node scripts/verify-timber-balustrade.mjs && node scripts/verify-timber-nose.mjs && node scripts/verify-timber-sheets.mjs && node scripts/verify-timber-takeoff.mjs && node scripts/verify-access-stairs.mjs && node scripts/verify-glass-cantilever.mjs && node scripts/verify-steel-stairs.mjs && node scripts/verify-steel-plate-dxf.mjs && node scripts/verify-design-catalog.mjs && node scripts/verify-glass-design.mjs && node scripts/verify-component-steel-design.mjs && node scripts/verify-connection-drawings.mjs && node scripts/verify-residual-stability-ground.mjs"
+    "verify": "node scripts/verify-geometry.mjs && node scripts/verify-winder.mjs && node scripts/verify-winder-parts.mjs && node scripts/verify-housings.mjs && node scripts/verify-workshop.mjs && node scripts/verify-housing-cam.mjs && node scripts/verify-tread-cam.mjs && node scripts/verify-tread-fit.mjs && node scripts/verify-project.mjs && node scripts/verify-profile.mjs && node scripts/verify-engineering.mjs && node scripts/verify-resistance.mjs && node scripts/verify-support-detail.mjs && node scripts/verify-escape-capacity.mjs && node scripts/verify-engineering-ifc.mjs && npm run verify:stair && npm run verify:trappenhuis && npm run verify:prefab && npm run verify:ontwerp && npm run verify:riser",
+    "verify:ontwerp": "node scripts/verify-timber-balustrade.mjs && node scripts/verify-timber-nose.mjs && node scripts/verify-timber-sheets.mjs && node scripts/verify-timber-takeoff.mjs && node scripts/verify-access-stairs.mjs && node scripts/verify-glass-cantilever.mjs && node scripts/verify-steel-stairs.mjs && node scripts/verify-steel-plate-dxf.mjs && node scripts/verify-design-catalog.mjs && node scripts/verify-glass-design.mjs && node scripts/verify-component-steel-design.mjs && node scripts/verify-connection-drawings.mjs && node scripts/verify-residual-stability-ground.mjs",
+    "verify:riser": "node scripts/verify-riser-cam.mjs && node scripts/verify-riser-nc-fit.mjs && node scripts/verify-riser-viewport.mjs && node scripts/verify-riser-ifc.mjs"
   },
   "dependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",

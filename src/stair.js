@@ -2,6 +2,7 @@ import { geometryErrors } from './stair-validity.js';
 import { emptyWell } from './stairwell.js';
 import { detailDefaults } from './stair-details.js';
 import { timberDefaults } from './timber-settings.js';
+import { housedStraightRisers } from './timber-riser.js';
 import { buildStairViews } from './stair-views.js';
 import { buildLandingFrame } from './landing-frame.js';
 import { makeCutStringer } from './cut-stringer.js';
@@ -33,7 +34,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.16',
+  version: '0.13.17',
   stairEnabled: true,
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
@@ -48,6 +49,7 @@ export const starterProject = {
   stair: {
     ...detailDefaults,
     ...timberDefaults,
+    riserJoint: 'butt', riserGrooveDepth: 8,
     mark: 'TR-01', name: 'Hoofdtrap', type: 'straight', material: 'Eiken · massief',
     materialName:'', materialFeature:'', materialApplication:'', nlsfbCode:'', nlsfbLandingCode:'', nlsfbRailingCode:'',
     floorHeight: 2880, width: 900, going: 250, risers: 18, nosing: 25,
@@ -149,6 +151,10 @@ export function generateStairGeometry(stair, options) {
   const rightEdge=cutRight?-width/2-overhang:-width/2+stringerThickness;
   const treadWidth=Math.max(1,leftEdge-rightEdge);
   const treadOffset=(leftEdge+rightEdge)/2;
+  const groovedRisers=housedStraightRisers(stair);
+  const rearSeat=groovedRisers ? Number(stair.riserThickness) : 0;
+  const frontLip=groovedRisers && stair.wellatType==='chamfered' ? Number(stair.wellatWidth) : 0;
+  const physicalRun=going+rearSeat+frontLip;
   const treads = [];
   const stringers = [];
   const landings = [];
@@ -157,8 +163,7 @@ export function generateStairGeometry(stair, options) {
     const normal = { x: -flight.direction.y, y: flight.direction.x };
     for (let step = 0; step < flight.treadCount; step++) {
       const nose = Number(stair.nosing) || 0;
-      const physicalRun = going;
-      const center = add(add(flight.origin, scale(flight.direction, (step + 0.5) * going - nose)),scale(normal,treadOffset));
+      const center = add(add(flight.origin, scale(flight.direction, step*going-nose-frontLip+physicalRun/2)),scale(normal,treadOffset));
       const halfRun = scale(flight.direction, physicalRun / 2);
       const halfWidth = scale(normal, treadWidth / 2);
       const level = flight.firstRiser + step + 1;
@@ -171,7 +176,7 @@ export function generateStairGeometry(stair, options) {
       treads.push({ id: `${stair.mark}-TD-${String(treads.length + 1).padStart(2, '0')}`,
         flightIndex: flight.index, step: step + 1, level, elevation: level * dimensions.rise,
         frontEdge: [corners[0], corners[3]], area: physicalRun * treadWidth,
-        goingAtWalkline: going, depthAtWalkline: physicalRun, narrowDepth: physicalRun,
+        goingAtWalkline: going, depthAtWalkline: going+frontLip, narrowDepth: going+frontLip,
         length: physicalRun, width: treadWidth, thickness,
         volume: (physicalRun * treadWidth * thickness) / 1e9,
         points: corners, svgPoints: pointString(corners), center, direction: flight.direction });
@@ -292,7 +297,7 @@ export function generateStairGeometry(stair, options) {
 
   const parts = [
     { id: `${stair.mark}-TD`, name: 'Trede · rechthoekig', quantity: treads.length,
-      length: going, width: treadWidth, thickness,
+      length: physicalRun, width: treadWidth, thickness,
       volume: treads.reduce((sum, tread) => sum + tread.volume, 0) },
     ...landings.map(landing => ({ id: landing.id, name: 'Bordesplaat · referentiemaat', quantity: 1,
       length: landing.length, width: landing.width, thickness: landing.thickness, volume: landing.volume })),

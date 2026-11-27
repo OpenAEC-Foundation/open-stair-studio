@@ -1,6 +1,7 @@
 <script>
   export let joinery;
   export let update;
+  export let riserGrooves = false;
   const fields = [
     { key: 'depth', label: 'Insteekdiepte', min: 0.1, max: 150, step: 0.1 },
     { key: 'clearance', label: 'Totale passpeling', min: 0, max: 10, step: 0.1 },
@@ -15,12 +16,12 @@
     <option value="housed">Ingefreesd · met insteeklip</option>
     <option value="none">Zonder uitgewerkte verbinding</option>
   </select>
-  {#if joinery.type === 'housed'}
-    {#each fields as field}
+  {#if joinery.type === 'housed' || riserGrooves}
+    {#each fields.filter(field => field.key!=='endMargin' || joinery.type==='housed') as field}
       <label for={'joinery-' + field.key}>{field.label}</label>
       <div class="numeric-input"><input id={'joinery-' + field.key} type="number" min={field.min} max={field.max} step={field.step} value={joinery[field.key]} onchange={e => update(field.key, e.currentTarget)} /><span>mm</span></div>
     {/each}
-    <p>De passpeling wordt over beide randen verdeeld. De schoudermaat houdt de lip vrij van de trederand en het uiteinde van de boom.</p>
+    <p>De insteekdiepte geldt voor het huis in de boom. De passpeling wordt over beide randen verdeeld.</p>
   {/if}
 </section>
 

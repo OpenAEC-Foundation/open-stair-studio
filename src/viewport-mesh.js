@@ -1,4 +1,6 @@
 import earcut from 'earcut';
+import { pocketedFace,boardFaceOutline } from './viewport-pockets.js';
+import { pointOnHousingFrame } from './housings.js';
 
 // Vertex and unit layout from Open BIM Suite's src/viewport/render.rs.
 const stride = 32;
@@ -89,6 +91,24 @@ export function buildViewportMesh(geometry, system = 'timber') {
   }
   for (const board of [...(geometry.treads ?? []), ...(geometry.landings ?? [])]) {
     const color = geometry.landings.includes(board) ? timber : treadColors[system] ?? timber;
+    const pockets = geometry.riserJoinery?.pockets.filter(p => p.hostId === board.id);
+    if (pockets?.length) {
+      const top = board.points.map(p => ({...p,z:board.elevation}));
+      if (faceNormal(top)?.[2]<0) top.reverse();
+      const bottom = top.map(p => ({...p,z:p.z-board.thickness}));
+      let faces = board.meshFaces ?? [top,[...bottom].reverse(),...bottom.map((a,i) => {
+        const j=(i+1)%bottom.length;
+        return [a,bottom[j],top[j],top[i]];
+      })];
+      for (const group of Map.groupBy(pockets,p=>p.face).values()) {
+        const pocket=group[0];
+        const outline = pocket.face==='top' && board.noseDetail
+          ? boardFaceOutline(board.meshFaces,board.elevation) : pocket.face==='top'?top:bottom;
+        if(outline.length>=3) faces=pocketedFace(faces,outline,group,pocket.inward);
+      }
+      mesh(faces,color);
+      continue;
+    }
     if(board.meshFaces&&system==='timber') {
       mesh(board.meshFaces,color);
       continue;
@@ -98,6 +118,13 @@ export function buildViewportMesh(geometry, system = 'timber') {
     prism(top, bottom, color);
   }
   for (const stringer of geometry.stringers ?? []) {
+    const stock = geometry.riserJoinery && geometry.housings?.beams.find(b=>b.id===stringer.id);
+    if (stock?.pockets.length && stringer.meshFaces && !stock.issues.some(i=>i.level==='error')) {
+      const inner = stock.outline.map(p=>pointOnHousingFrame(stock.frame,p));
+      const normal = stock.frame.zAxis;
+      mesh(pocketedFace(stringer.meshFaces,inner,stock.pockets,{x:-normal.x,y:-normal.y,z:-normal.z}),stringerColor);
+      continue;
+    }
     if (stringer.meshFaces) {
       for (const polygon of stringer.meshFaces) face(polygon, stringerColor);
     } else {

@@ -1,14 +1,12 @@
 <script>
-  import { generateStairGeometry } from './stair.js';
-  import { buildStairDetails } from './stair-details.js';
   import {timberDimensions,timberStyles,noseNames} from './timber-settings.js';
   export let stair;
+  export let parts = [];
   export let update;
   export let issue = null;
+  $: supportsGrooves = stair.riserPosition!=='manual' && !['quarter_winder','half_winder'].includes(stair.type);
   function exportDetails() {
     if (issue) return;
-    const model=generateStairGeometry(stair,{projectIsometric:false});
-    const parts=buildStairDetails(stair,model);
     const rows=[['Merk','Onderdeel','Materiaal','Aantal','Aslengte mm','Diameter mm','Hoogte mm','Dikte mm','Netto m³','Profiel','Ruwlengte mm','Ruwbreedte mm','Ruwdikte mm','Bruto m³'],
       ...parts.map(p=>[p.id,p.label,p.material==='timber'?stair.material:'Verzinkt staal',1,p.lengthMm,p.diameterMm,p.heightMm,p.thicknessMm,p.volumeM3,p.profileName,p.stockLengthMm,p.stockWidthMm,p.stockThicknessMm,p.stockVolumeM3])];
     const cell=x=>'"'+(typeof x==='number'?x.toLocaleString('nl-NL',{useGrouping:false,maximumFractionDigits:6}):String(x??'')).replaceAll('"','""')+'"';
@@ -41,6 +39,15 @@
     <option value="none">Open trap</option><option value="closed">Houten stootborden</option>
   </select>
   {#if stair.riserBoards==='closed'}
+    <label for="riser-joint">Verbinding stootbord</label>
+    <select id="riser-joint" value={stair.riserJoint} onchange={e=>update('riserJoint',e.currentTarget.value)}>
+      <option value="butt">Stuikend</option><option value="housed" disabled={!supportsGrooves}>Ingefreesd in trede en boom</option>
+    </select>
+    {#if !supportsGrooves}<small>Infrezingen zijn beschikbaar voor verticale stootborden in rechte vluchten en bordestrappen.</small>{/if}
+    {#if stair.riserJoint==='housed'}
+      <label for="riser-groove-depth">Groefdiepte in trede of bordes (mm)</label>
+      <input id="riser-groove-depth" class="text-field" type="number" min="1" max="30" step="0.1" value={stair.riserGrooveDepth} onchange={e=>update('riserGrooveDepth',e.currentTarget)}/>
+    {/if}
     <label for="stair-riser-thickness">Dikte stootbord (mm)</label>
     <input id="stair-riser-thickness" class="text-field" type="number" min="8" max="42" value={stair.riserThickness} onchange={e=>update('riserThickness',e.currentTarget)} />
     {#if !['quarter_winder','half_winder'].includes(stair.type)}

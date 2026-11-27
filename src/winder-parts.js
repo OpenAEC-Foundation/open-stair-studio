@@ -85,12 +85,14 @@ export function makePartsCsvRows(geometry, material, cncStock) {
     'Netto m3', 'Bruto m3', 'Materiaal', 'Tredenummer', 'Bovenkant mm',
     'Aantrede klimlijn mm', 'Tredevlak klimlijn mm', 'Kortste zijmaat langs wang mm', 'Contouroppervlak mm2'];
   if (geometry.housings) header.push('Insteeklippen', 'Infrezingen', 'Insteekdiepte mm');
+  if (geometry.riserJoinery) header.push('Stootbordgroeven', 'Groefdiepte stootbord mm');
   if (hasProfiles) header.push('Neusprofiel','Profielmaat mm','Lengte voorrand mm','Volumevermindering neus cm3');
   return [[...header, ...extraHeader], ...geometry.parts.map(p => [
     p.id, p.name, p.quantity, mm(p.length), mm(p.width), mm(p.thickness),
     p.volume.toFixed(8), p.blankVolume.toFixed(8), material, p.level ?? '', mm(p.elevation),
     mm(p.goingAtWalkline), mm(p.depthAtWalkline), mm(p.narrowDepth), mm(p.area),
     ...(geometry.housings ? [p.tongueCount ?? '', p.pocketCount ?? '', p.kind === 'landing' ? '' : mm(geometry.housings.settings.depth)] : []),
+    ...(geometry.riserJoinery ? [p.riserPockets?.length ?? '', mm(p.riserPockets?.[0]?.depth)] : []),
     ...(hasProfiles ? (p.noseDetail?[p.noseDetail.kind==='round'?'Kwartrond bovenrand':'Velling 45° bovenrand',p.noseDetail.sizeMm,
       mm(p.noseDetail.frontLengthMm),mm(p.noseDetail.removedMm3/1000)]:['','','','']) : []),
     ...stockFields(p.kind === 'tread' ? p : null)

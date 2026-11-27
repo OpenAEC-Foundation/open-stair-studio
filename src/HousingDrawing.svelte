@@ -108,7 +108,7 @@
           <rect class="blank" x={overview.x(0)} y={overview.y(beam.width)} width={overview.x(beam.length)-overview.x(0)} height={overview.y(0)-overview.y(beam.width)}/>
           <polygon points={overview.polygon(beam.outline)} class="face"/>
           {#each rows as row}
-            <polygon points={overview.polygon(row.pocket.contour)} class="cut" class:open-edge={row.pocket.openEdge}><title>{row.pocket.treadId}</title></polygon>
+            <polygon points={overview.polygon(row.pocket.contour)} class="cut" class:riser={!!row.pocket.riserId} class:open-edge={row.pocket.openEdge}><title>{row.pocket.treadId}</title></polygon>
           {/each}
           {#each rows as row}
             {@const cx = overview.x(mid(row.box.x))}
@@ -124,12 +124,13 @@
           <text class="axis-text" x={overview.x(0)-5} y={overview.y(0)-29}>Y</text>
         </svg>
         <div class="key"><span><i class="stock-key"></i>Ruwe plank</span><span><i class="face-key"></i>{beam.profile==='cut'?'Keepcontour':'Binnenvlak'}</span>{#if beam.profile!=='cut'}<span><i class="cut-key"></i>Nominale infrezing</span>{/if}</div>
+        {#if rows.some(r=>r.pocket.riserId)}<p class="instruction">De oranje groeven ontvangen de lippen van de stootborden.</p>{/if}
         {#if rows.length}
           <table class="coordinates operations">
             <caption>Infrezingen vanaf het binnenvlak</caption>
             <thead>
               {#if rows.length > 17}<tr class="table-identity"><th colspan="6">{beam.id} · {side} bij oplopen · {metadata.number ?? ''} · revisie {metadata.revision ?? '–'}</th></tr>{/if}
-              <tr><th>Nr.</th><th>Trede</th><th>X min / max</th><th>Y min / max</th><th>Z bodem</th><th>Ligging</th></tr>
+              <tr><th>Nr.</th><th>Onderdeel</th><th>X min / max</th><th>Y min / max</th><th>Z bodem</th><th>Ligging</th></tr>
             </thead>
             <tbody>
               {#each rows as row}
@@ -168,7 +169,7 @@
               {/each}
             </svg>
             {#if operation}
-              <div class="key"><span><i class="cut-key"></i>Nominale contour</span><span><i class="swept-key"></i>Freesbereik Ø{mm(preview.job.cam.toolDiameter)} · {preview.job.cam.cornerMode === 'dogbone' ? 'hoekontlasting' : 'ronde binnenhoeken'}</span></div>
+              <div class="key"><span><i class="cut-key"></i>Nominale contour</span><span><i class="swept-key"></i>Freesbereik Ø{mm(preview.job.cam.toolDiameter)} · {operation.relief.length ? 'hoekontlasting' : 'ronde binnenhoeken'}</span></div>
             {:else if preview?.problem}<p class="section-note">Freesbereik niet beschikbaar. {preview.problem}</p>{/if}
           </div>
           <table class="coordinates vertices">
@@ -234,6 +235,7 @@
   .face { fill: #efe7d8; stroke: #675c47; stroke-width: 1.3; }
   .cut { fill: #b8d9d1; stroke: #1c6058; stroke-width: 1.15; }
   .cut.open-edge { stroke-dasharray: 3 1; }
+  .cut.riser { fill:#e9bb83;stroke:#975719; }
   .cut.nominal { fill: none; vector-effect: non-scaling-stroke; }
   .swept { fill: #9dc5ba; stroke: #9dc5ba; stroke-linejoin: round; }
   .relief { stroke: #9dc5ba; stroke-linecap: round; }

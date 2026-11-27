@@ -2,6 +2,11 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.17
+
+- Kies bij houten trappen onder **Houtdetails → Verbinding stootbord** voor **Ingefreesd in trede en boom**. Verticale stootborden krijgen lippen in de aangrenzende treden, de ingekroosde bomen en het tussenbordes. Aan de vloer en bij de kopse wang toont het werkblad de werkelijke beëindiging. Opgeslagen ontwerpen behouden hun bestaande aansluiting.
+- De werkbladen tonen per onderdeel de groeven, lippen en opspanzijde. Voor het boven- en ondervlak zijn afzonderlijke DXF- en LinuxCNC-bestanden beschikbaar. Bij het wijzigen van de neus volgen de beide groeven, de stootborden, het bordesraam, de hoeveelheden en de IFC4-onderdelen.
+
 ## Nieuw in 0.13.16
 
 - Het plaatwangblad drukt nu als één A3-landscapeblad af. De contour, bruto- en nettomassa, alle opleghoekreferenties en de productienoot blijven bij elkaar.

@@ -100,6 +100,17 @@ export function timberViews(row, stationIndex = 0) {
   if (row.type === 'riser' || row.type === 'nosingStrip') {
     const p=row.part, top=diagram('Plankvoet · bovenaanzicht',[line(p.faceContour)],'Lokale X langs de voorrand. Y loopt van de zichtzijde naar achteren.');
     if (row.type==='nosingStrip') return [top,diagram('Wellat · dwarsdoorsnede',[line(p.profileContour)],'Gemeten loodrecht op de lengteas van de wellat.')];
+    if (p.joineryFeatures?.length) {
+      const rectangle=(u0,v0,u1,v1,mode)=>line([point(u0,v0),point(u1,v0),point(u1,v1),point(u0,v1)],mode);
+      const front=[rectangle(0,0,p.lengthMm,p.heightMm,'wood')];
+      const side=[rectangle(0,0,p.thicknessMm,p.heightMm,'wood')];
+      for(const {localTongueBox:[x0,x1,y0,y1,z0,z1]} of p.joineryFeatures) {
+        front.push(rectangle(y0,z0,y1,z1,'joint'));
+        side.push(rectangle(x0,z0,x1,z1,'joint'));
+      }
+      return [diagram('Aanzicht op stootbord en lippen',front,'X loopt naar links bij stijgen. Nulpunt op voet en schouder van het stootbord.'),
+        diagram('Zijaanzicht lippen',side,'X loopt van de zichtzijde naar de achterkant. De lip ligt tussen de twee schouders.')];
+    }
     const t=p.stockThicknessMm,h=p.stockWidthMm;
     return [top,diagram('Stootbord · dwarsdoorsnede',[line(p.profileContour??[point(0,0),point(t,0),point(t,h),point(0,h)])],
       p.profileContour?(p.developedHeightMm>p.heightMm+1e-6?'Afwijkend schuin stootbord: doorsnede en ruwplank volgen de ontwikkelde lengte.':'Verticaal stootbord: rechte doorsnede en ruwplank volgens de vrije hoogte.'):

@@ -1,7 +1,10 @@
 <script>
   import { createTreadDxf } from './tread-dxf.js';
+  import RiserGrooveSheet from './RiserGrooveSheet.svelte';
+  import { riserFaceResults } from './riser-face-cam.js';
 
   export let geometry;
+  export let model;
   export let downloadFile;
   export let housingIssues = [];
   export let openHousing;
@@ -13,6 +16,7 @@
   $: treads = geometry.parts.filter(part => part.kind === 'tread');
   $: selected = treads.find(tread => tread.id === selectedId) ?? treads.find(tread => tread.isWinder) ?? treads[0];
   $: connections = geometry.housings?.treads.find(tread => tread.id === selected?.id)?.tongues ?? [];
+  $: grooveResults = riserFaceResults(selected,model,geometry.riserJoinery?.issues);
   const length = value => value.toLocaleString('nl-NL', { maximumFractionDigits: 1 });
   const cubic = value => value.toLocaleString('nl-NL', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
   const pointString = pts => pts.map(p => p.x + ',' + p.y).join(' ');
@@ -96,6 +100,12 @@
       </div>
     {/if}
     <p class="stock-note">De DXF bevat de gesloten contour in millimeters. Het nulpunt ligt linksonder op de ruwe plank in dit bovenaanzicht. De ruwe plankmaat is naar boven afgerond op hele millimeters.</p>
+    {#if grooveResults.length}
+      <div class="groove-set">
+        <p class="print-groove-title">{model.project.number} · revisie {model.project.revision} · {selected.id} · bewerkingsvlakken</p>
+        <RiserGrooveSheet results={grooveResults} {model} {downloadFile}/>
+      </div>
+    {/if}
   </article>
 {/if}
 
@@ -104,6 +114,7 @@
   .key .lip { border-top: 3px solid #297960; }
   .detail-actions .action-btn.go-cam { margin-left: 0; border-color: var(--oa-accent); color: var(--oa-accent-text); }
   .connections { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin: 12px 0; font-size: 11px; }
+  .print-groove-title {display:none}
   @media print { .connections .part-link { color: black; text-decoration: none; } }
   .schedule-switcher, .detail-actions { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
   .schedule-switcher { border-bottom: 1px solid var(--oa-border); gap: 12px; }
@@ -138,5 +149,10 @@
     .winder-table thead { display: table-header-group; }
     .winder-table tfoot { display: table-row-group; }
     .tread-sheet { break-inside: avoid; }
+    .tread-sheet:has(.groove-set) { break-inside:auto;border:0;padding:0; }
+    .groove-set {break-before:page}
+    .print-groove-title {display:block;font-size:10pt;font-weight:600;margin:0 0 2mm}
+    :global(.production-view:has(.groove-set) .production-warning:not([role=status])) {display:none}
+    :global(.production-view:has(.groove-set) .button-row) {display:none}
   }
 </style>

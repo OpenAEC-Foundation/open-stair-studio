@@ -1,3 +1,8 @@
+import { isWinder } from './winder.js';
+
+export const housedStraightRisers = stair => stair.riserBoards==='closed' &&
+  stair.riserJoint==='housed' && stair.riserPosition!=='manual' && !isWinder(stair.type);
+
 const signedArea = points=>points.reduce((sum,a,i)=>{
   const b=points[(i+1)%points.length];
   return sum+a.x*b.y-a.y*b.x;

@@ -128,7 +128,23 @@ function planPocket(pocket, face, stock, cam) {
   // Tolerance compensates the final coordinate rounding to 4 decimal places.
   const radius = cam.toolDiameter/2;
   const ring = insetCorners(loop,radius+.0001,pocket.id);
-  const relief = cam.cornerMode !== 'dogbone' ? [] : ring.map((center,i) => {
+  // Riser grooves have end clearance for a square tongue and round cutter.
+  // The four tongue corners must lie in the rounded region actually cleared.
+  if (pocket.riserId) {
+    const local = point => {
+      const v = {x:point.x-stock.frame.origin.x,y:point.y-stock.frame.origin.y,z:point.z-stock.frame.origin.z};
+      const project = axis => dot(v,axis)+v.z*axis.z;
+      return {x:project(stock.frame.xAxis),y:project(stock.frame.yAxis),z:project(stock.frame.zAxis)};
+    };
+    const swept = convexLoop(ring.map(p=>({x:Number(p.x.toFixed(4)),y:Number(p.y.toFixed(4))})),pocket.id);
+    const corners = pocket.tongueWorldContour?.map(local);
+    if (corners?.length!==4 || !Number.isFinite(pocket.tongueDepth) || pocket.tongueDepth<=0 ||
+        pocket.tongueDepth>depth+.0001 || corners.some(p=>![p.x,p.y,p.z].every(Number.isFinite) ||
+          Math.abs(p.z)>.001 || pointToLoop(p,swept)>radius+.0001)) {
+      throw new Error(`${pocket.id}: de stootbordlip past niet in de gefreesde groef. Controleer de freesdiameter, diepte en passpeling.`);
+    }
+  }
+  const relief = cam.cornerMode !== 'dogbone' || pocket.riserId ? [] : ring.map((center,i) => {
     const corner = loop.points[i], d = dist(corner,center);
     const end = offsetPoint(corner,delta(center,corner),(radius-.001)/d);
     if (clearance(face.planes,end) < radius+.0001) {
@@ -151,7 +167,7 @@ function planPocket(pocket, face, stock, cam) {
   const ys = ring.map(p => p.y);
   const step = cam.toolDiameter*cam.stepoverPercent/100;
   const rows = Math.max(1, Math.ceil((Math.max(...ys) - Math.min(...ys)) / step));
-  return { id:pocket.id, treadId:pocket.treadId, loop, ring, relief, depth, passes, rows };
+  return { id:pocket.id, treadId:pocket.treadId, ...(pocket.riserId?{riserId:pocket.riserId}:{}), loop, ring, relief, depth, passes, rows };
 }
 
 function checkNeighbours(operations, radius) {
@@ -219,7 +235,8 @@ const xy = p => 'X'+f(p.x)+' Y'+f(p.y);
 
 export function housingFileStem(stock, metadata = {}, onlyPocketId = '') {
   const pieces = [cncIdentifier(metadata.number,32,true), metadata.revision && 'rev-'+cncIdentifier(metadata.revision,16,true),
-    cncIdentifier(metadata.stairMark,32,true), cncIdentifier(stock.id,48,true), 'binnenvlak'];
+    cncIdentifier(metadata.stairMark,32,true), cncIdentifier(stock.id,48,true),
+    stock.face==='underside'?'ondervlak-groeven':stock.face==='top'?'bovenvlak-groeven':'binnenvlak'];
   if (onlyPocketId) pieces.push('alleen-'+cncIdentifier(onlyPocketId,48,true));
   return pieces.filter(Boolean).join('_');
 }
@@ -229,7 +246,9 @@ export function writeLinuxCnc(job) {
   const lines = [
     '(Open Stair Studio - LinuxCNC 3-axis - housing pockets)',
     '(File '+housingFileStem(stock,metadata,job.onlyPocketId)+')',
-    '(G54 X0 Y0 lower-left blank envelope. X+ uphill from low to high stair end. Z0 inside face. Z+ towards spindle.)',
+    stock.face==='underside'||stock.face==='top' ?
+      '(G54 X0 Y0 lower left of rectangular blank. '+(stock.face==='underside'?'UNDERSIDE UP. Flip around X from top view.':'TOP FACE UP.')+' Z0 at machining face. Before profiling.)' :
+      '(G54 X0 Y0 lower-left blank envelope. X+ uphill from low to high stair end. Z0 inside face. Z+ towards spindle.)',
     '(Single mounted centre-cut end mill D'+f(cam.toolDiameter)+' mm. Tool length offset OFF. No active G52/G92.)',
     '(Depth per pass max '+f(cam.stepDown)+' mm. Corner mode '+cam.cornerMode+'. Scope '+(job.onlyPocketId ? 'selected pocket' : 'whole beam')+'.)'
   ];
@@ -288,10 +307,14 @@ export function writeHousingDxf(stock, metadata = {}) {
   const poly = points => drawing.drawPolyline(points.map(p=>[p.x,p.y]),true);
   select('OSS-FACE',7);
   poly(stock.outline);
+  if(stock.partContour) {
+    select('OSS-PART-REFERENCE',7);
+    poly(stock.partContour);
+  }
   select('OSS-SETUP',7);
   drawing.drawText(0,-10,4,0,housingFileStem(stock,metadata));
   for (const pocket of stock.pockets) {
-    select('OSS-POCKET-D'+pocket.depth.toFixed(3).replace('.','p'),3);
+    select((pocket.riserId?'OSS-STOOTBORD-D':'OSS-POCKET-D')+pocket.depth.toFixed(3).replace('.','p'),3);
     poly(pocket.contour);
     select('OSS-MARK',7);
     const center = pocket.contour.reduce((s,p)=>({ x:s.x+p.x/pocket.contour.length,y:s.y+p.y/pocket.contour.length }),{x:0,y:0});

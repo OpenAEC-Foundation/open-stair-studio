@@ -108,12 +108,18 @@ function checkConnection(part, tongue, beam, housingCam, job, cutterPath) {
 export function verifyTreadFit(part, workshop, housingCam, job) {
   const connections = [];
   const beamIds = new Set(part.tongues.map(tongue => tongue.beamId));
+  const flight = workshop.treads.find(t => t.id === part.id)?.flightIndex;
+  const requiredSides = new Set((workshop.housings?.beams ?? [])
+    .filter(b => b.flightIndex === flight && b.profile !== 'cut').map(b => b.side));
+  const fittedSides = new Set(part.tongues.map(tongue => tongue.side));
   const issues = (workshop.housings?.issues ?? [])
     .filter(issue => issue.level === 'error' && (issue.treadId ? issue.treadId === part.id : !issue.beamId || beamIds.has(issue.beamId)))
     .map(issue => issue.message);
   if (!job || job.partId !== part.id || -nc(job.levels.at(-1)) < part.thickness) {
     issues.push('Een geldige doorgaande freesbaan voor deze trede ontbreekt.');
-  } else if (workshop.housings && (part.tongues.length < 2 || !part.boardFrame)) {
+  } else if (workshop.housings && workshop.housings.settings?.type!=='none' &&
+      ([...requiredSides].some(side => !fittedSides.has(side)) ||
+       !part.boardFrame)) {
     issues.push('De trede heeft onvoldoende gekoppelde insteeklippen of mist het planknulpunt.');
   } else {
     const path = job.path.map(asWritten);

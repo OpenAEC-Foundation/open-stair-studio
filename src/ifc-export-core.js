@@ -5,6 +5,7 @@ import { defaultEngineering, deriveEngineering } from './engineering.js';
 import { buildStairDetails } from './stair-details.js';
 import { profileTimberTread } from './timber-tread-profile.js';
 import { checkLandingJoints } from './landing-joint-check.js';
+import { buildWorkshop } from './workshop.js';
 
 const enumValue = value => ({ type: 3, value });
 const stairTypes = {
@@ -21,6 +22,14 @@ export function createIfc4WithApi(api, model, geometry) {
   // An unprofiled design check admits concept designs with outstanding Bbl findings.
   const issue = inspectStair({stair,engineering:model.engineering}).find(item => item.level === 'error');
   if (issue) throw new Error(issue.detail);
+  const joinedRisers = (model.engineering?.structureType ?? 'timber') === 'timber'
+    && stair.riserBoards === 'closed' && stair.riserJoint === 'housed';
+  if (joinedRisers && !geometry.riserJoinery) geometry = buildWorkshop(geometry, model, geometry.detailParts);
+  if (joinedRisers) {
+    const error = [...(geometry.housings?.issues ?? []), ...(geometry.riserJoinery?.issues ?? [])]
+      .find(item => item.level === 'error');
+    if (error) throw new Error(error.message ?? error.detail);
+  }
   const rectangular = [...geometry.stringers, ...geometry.landings,
     ...(model.engineering?.structureType === 'timber' ? geometry.landingFrame ?? [] : [])];
   if (!geometry.dimensions.family.winder) rectangular.push(...geometry.treads);
@@ -58,6 +67,7 @@ function writeModel(api, sid, model, geometry) {
   const dossier = deriveEngineering(model, geometry);
   const landingJointCheck = checkLandingJoints(model, geometry);
   const separateTreads = engineering.structureType !== 'timber';
+  const joined = !separateTreads && Boolean(geometry.riserJoinery?.pockets.length);
   const surfaceTreads = ['grating', 'custom'].includes(engineering.structureType);
   const profiledTimber=!separateTreads&&['round','bevel'].includes(stair.noseProfile);
   let profiledTreadBrepCount=0;
@@ -132,6 +142,11 @@ function writeModel(api, sid, model, geometry) {
     ['OverallWidth_mm', IFC.IFCLENGTHMEASURE, stair.width], ['ClearTreadWidth_mm', IFC.IFCLENGTHMEASURE, d.clearWidth ?? geometry.treads[0].width], ['RiserCount', IFC.IFCINTEGER, d.risers],
     ['RiserHeight_mm', IFC.IFCLENGTHMEASURE, d.rise], ['Going_mm', IFC.IFCLENGTHMEASURE, stair.going],
     ['TreadCount', IFC.IFCINTEGER, d.treadCount],
+    ...(joined ? [
+      ['RiserJoint', IFC.IFCLABEL, 'Stootbord met gefreesde aansluiting'],
+      ['RiserGrooveDepth_mm', IFC.IFCLENGTHMEASURE, stair.riserGrooveDepth],
+      ['RiserPocketCount', IFC.IFCINTEGER, geometry.riserJoinery.pockets.length]
+    ] : []),
     ...(profiledTimber?[
       ['NosingProfile', IFC.IFCLABEL, stair.noseProfile==='round'?'Upper quarter round':'Upper 45 degree bevel'],
       ['NosingSize_mm', IFC.IFCLENGTHMEASURE, stair.noseSize]
@@ -146,7 +161,8 @@ function writeModel(api, sid, model, geometry) {
       ['HousingDepth_mm', IFC.IFCLENGTHMEASURE, model.joinery.depth],
       ['HousingTotalClearance_mm', IFC.IFCLENGTHMEASURE, model.joinery.clearance],
       ['HousingShoulder_mm', IFC.IFCLENGTHMEASURE, model.joinery.endMargin],
-      ['GeometryScope', IFC.IFCLABEL, 'Nominal coordination solids. Joint geometry in workshop drawings and CAM.']
+      ['GeometryScope', IFC.IFCLABEL, joined ? 'Treden met lippen en uitgefreesde stootbord- en tredehuizen' :
+        'Nominal coordination solids. Joint geometry in workshop drawings and CAM.']
     ] : []),
     ...(windingFlight ? [
       ['TurnDirection', IFC.IFCLABEL, stair.turnDirection ?? 'left'],
@@ -189,7 +205,7 @@ function writeModel(api, sid, model, geometry) {
     if(profiledTimber) {
       // Coordination bodies stop at the inner stringer face. The workshop
       // contour also includes housed tongues, whose sockets are machined in CAM.
-      const body=profileTimberTread(tread,stair);
+      const body=tread.noseDetail ? tread : profileTimberTread(tread,stair);
       if(!body.noseDetail) throw new Error('Ongeldige profielmaat aan de voorrand van '+tread.id+'.');
       const vertices=new Map();
       const faces=body.meshFaces.map(polygon=>{
@@ -202,7 +218,7 @@ function writeModel(api, sid, model, geometry) {
       profiledTreadBrepCount++;
       return e(IFC.IFCFACETEDBREP,e(IFC.IFCCLOSEDSHELL,faces));
     }
-    if (!windingFlight) {
+    if (!windingFlight && !joined) {
       return boxSolid(tread.center, tread.direction, tread.length, tread.width, tread.thickness, baseZ);
     }
     const vertices = tread.points.map(p => e(IFC.IFCCARTESIANPOINT, [length(p.x), length(p.y)]));
@@ -232,6 +248,43 @@ function writeModel(api, sid, model, geometry) {
     const shape = e(IFC.IFCSHAPEREPRESENTATION, context, label('Body'), label(type), solids);
     return e(IFC.IFCPRODUCTDEFINITIONSHAPE, null, null, [shape]);
   }
+  // IFC uses metres and local 2D profile coordinates. Each cutter keeps the
+  // workshop pocket ID, so the actual host and machining feature can be traced.
+  const cutsByHost = new Map();
+  function registerCut(hostId, pocket, inward) {
+    if (!cutsByHost.has(hostId)) cutsByHost.set(hostId, []);
+    cutsByHost.get(hostId).push({pocket, inward});
+  }
+  if (joined) {
+    for (const pocket of geometry.riserJoinery.pockets) registerCut(pocket.hostId, pocket, pocket.inward);
+    const riserIds = new Set(geometry.riserJoinery.pockets.map(p => p.id));
+    for (const job of geometry.housings?.beams ?? []) {
+      for (const pocket of job.pockets) {
+        if (riserIds.has(pocket.id)) continue;
+        const n = job.frame.zAxis;
+        registerCut(job.id, pocket, {x:-n.x, y:-n.y, z:-n.z});
+      }
+    }
+  }
+  function finishedBody(hostId, blank) {
+    const cuts = cutsByHost.get(hostId);
+    if (!cuts?.length) return representation([blank]);
+    let solid = blank;
+    for (const {pocket, inward:n} of cuts) {
+      const [o, b] = pocket.worldContour;
+      const edgeLength = Math.hypot(b.x-o.x, b.y-o.y, b.z-o.z);
+      const x = [(b.x-o.x)/edgeLength, (b.y-o.y)/edgeLength, (b.z-o.z)/edgeLength];
+      const y = [n.y*x[2]-n.z*x[1], n.z*x[0]-n.x*x[2], n.x*x[1]-n.y*x[0]];
+      const project = (p, axis) => length((p.x-o.x)*axis[0] + (p.y-o.y)*axis[1] + (p.z-o.z)*axis[2]);
+      const points = pocket.worldContour.map(p => e(IFC.IFCCARTESIANPOINT, [project(p,x),project(p,y)]));
+      const contour = e(IFC.IFCPOLYLINE, [...points,points[0]]);
+      const profile = e(IFC.IFCARBITRARYCLOSEDPROFILEDEF, enumValue('AREA'), label(pocket.id), contour);
+      const frame = axis3([mm(o.x),mm(o.y),mm(o.z)], [n.x,n.y,n.z], x);
+      const cutter = e(IFC.IFCEXTRUDEDAREASOLID, profile, frame, direction([0,0,1]), length(pocket.depth));
+      solid = e(IFC.IFCBOOLEANRESULT, enumValue('DIFFERENCE'), solid, cutter);
+    }
+    return representation([solid], 'CSG');
+  }
   const stairChildren = [];
   const timberObjects = separateTreads ? [] : [stairElement];
   const flightObjects = [];
@@ -242,6 +295,8 @@ function writeModel(api, sid, model, geometry) {
   const railingObjects = [];
   const typedDetails = new Map();
   const treadObjects = [];
+  const joinedStrings = [];
+  const joinedSteps = [];
   const partRelations = [];
   function reservation(id, role, solid, parentPlacement) {
     const object = e(IFC.IFCBUILDINGELEMENTPROXY, api.CreateIFCGloballyUniqueId(sid), null,
@@ -271,10 +326,26 @@ function writeModel(api, sid, model, geometry) {
     const flightPlacement = localPlacement(stairPlacement);
     const plates = separateTreads ? treads.map(tread => engineeringTread(tread, flightPlacement)) : [];
     const parts = [...plates];
-    const solids = separateTreads ? [] : treads.map(treadSolid);
+    const solids = separateTreads || joined ? [] : treads.map(treadSolid);
+    if (joined) {
+      for (const tread of treads) {
+        const object = e(IFC.IFCPLATE, api.CreateIFCGloballyUniqueId(sid), null, label(tread.id), null,
+          label('Houten trede'), localPlacement(flightPlacement), finishedBody(tread.id, treadSolid(tread)),
+          identifier(tread.id), enumValue('USERDEFINED'));
+        parts.push(object);
+        joinedSteps.push(object);
+      }
+    }
     for (const beam of geometry.stringers.filter(item => item.flightIndex === flight.index)) {
       const solid = beam.faces ? mitredBeamSolid(beam) : slopedBeamSolid(beam);
       if (separateTreads) parts.push(reservation(beam.id, 'wang', solid, flightPlacement));
+      else if (joined) {
+        const object = e(IFC.IFCMEMBER, api.CreateIFCGloballyUniqueId(sid), null, label(beam.id), null,
+          label('Houten trapboom'), localPlacement(flightPlacement), finishedBody(beam.id, solid),
+          identifier(beam.id), enumValue('STRINGER'));
+        joinedStrings.push(object);
+        parts.push(object);
+      }
       else solids.push(solid);
     }
     const flightRep = representation(solids);
@@ -316,7 +387,7 @@ function writeModel(api, sid, model, geometry) {
     const solid = boxSolid(center, { x: 1, y: 0 }, maxX - minX, maxY - minY, landing.thickness, landing.elevation - landing.thickness);
     const slab = separateTreads ? reservation(landing.id, 'bordes', solid, stairPlacement) :
       e(IFC.IFCSLAB, api.CreateIFCGloballyUniqueId(sid), null, label(landing.id), text('Trapbordes · conceptplaat'), label('Landing'),
-      localPlacement(stairPlacement), representation([solid]), identifier(landing.id), enumValue('LANDING'));
+      localPlacement(stairPlacement), finishedBody(landing.id, solid), identifier(landing.id), enumValue('LANDING'));
     stairChildren.push(slab);
     landingObjects.push(slab);
     if (!separateTreads) timberObjects.push(slab);
@@ -421,6 +492,7 @@ function writeModel(api, sid, model, geometry) {
     partRelations.push(relationship(IFC.IFCRELASSOCIATESMATERIAL,screwObjects,material));
   }
   if (timberObjects.length) {
+    timberObjects.push(...joinedStrings, ...joinedSteps);
     const material = e(IFC.IFCMATERIAL, label(specifiedTimber), null, label('wood'));
     partRelations.push(relationship(IFC.IFCRELASSOCIATESMATERIAL, timberObjects, material));
   }
@@ -445,6 +517,8 @@ function writeModel(api, sid, model, geometry) {
     typeRelations.push(relationship(IFC.IFCRELDEFINESBYTYPE,screwObjects,type));
   }
   assignType(treadObjects, IFC.IFCPLATETYPE, `${dossier.structureLabel} · trede`, 'USERDEFINED');
+  assignType(joinedSteps, IFC.IFCPLATETYPE, 'Houten trede', 'USERDEFINED');
+  assignType(joinedStrings, IFC.IFCMEMBERTYPE, 'Houten trapboom', 'STRINGER');
   assignType(reservedObjects, IFC.IFCBUILDINGELEMENTPROXYTYPE, 'Ruimtereservering trapconstructie', 'PROVISIONFORSPACE');
   for (const [key, objects] of typedDetails) {
     const [kind, role] = key.split(':');
@@ -458,7 +532,7 @@ function writeModel(api, sid, model, geometry) {
     const groups = new Map();
     const codeFor = object => (landingObjects.includes(object) || frameObjects.includes(object) || screwObjects.includes(object)) ? stair.nlsfbLandingCode || stair.nlsfbCode :
       railingObjects.includes(object) ? stair.nlsfbRailingCode || stair.nlsfbCode : stair.nlsfbCode;
-    for (const object of [stairElement, ...stairChildren, ...treadObjects]) {
+    for (const object of [stairElement, ...stairChildren, ...treadObjects, ...joinedSteps, ...joinedStrings]) {
       const code = codeFor(object);
       if (!groups.has(code)) groups.set(code, []);
       if (!groups.get(code).includes(object)) groups.get(code).push(object);
@@ -491,14 +565,17 @@ function writeModel(api, sid, model, geometry) {
     const landingCount = separateTreads ? Array.from({length:proxyIds.size()}, (_, i) =>
       api.GetLine(validationId, proxyIds.get(i))).filter(proxy => proxy.ObjectType?.value === 'Ruimtereservering bordes').length : count(IFC.IFCSLAB);
     const brepCount = count(IFC.IFCFACETEDBREP);
-    const solidCount = count(IFC.IFCEXTRUDEDAREASOLID) + brepCount + count(IFC.IFCTRIANGULATEDFACESET);
+    // Each pocket uses one extrusion as the second operand of a difference.
+    const cutterCount = [...cutsByHost.values()].reduce((sum, cuts) => sum + cuts.length, 0);
+    const solidCount = count(IFC.IFCEXTRUDEDAREASOLID) - cutterCount + brepCount + count(IFC.IFCTRIANGULATEDFACESET);
     const surfaceCount = count(IFC.IFCFACEBASEDSURFACEMODEL);
     const expectedBreps = geometry.stringers.filter(beam=>!!beam.faces).length + detailParts.length - indexedDetailCount + profiledTreadBrepCount + screwObjects.length;
     const expectedSolids = (surfaceTreads ? 0 : geometry.treads.length) + geometry.landings.length + geometry.stringers.length + detailParts.length + frameObjects.length + screwObjects.length;
     if (schema !== IFC.Schemas.IFC4 || stairCount !== 1 || flightCount !== geometry.flights.length ||
-        count(IFC.IFCPLATE) !== (separateTreads ? geometry.treads.length : 0) + detailParts.filter(p=>p.kind==='plate').length ||
+        count(IFC.IFCBOOLEANRESULT) !== cutterCount ||
+        count(IFC.IFCPLATE) !== (separateTreads ? geometry.treads.length : joinedSteps.length) + detailParts.filter(p=>p.kind==='plate').length ||
         count(IFC.IFCRAILING) !== detailParts.filter(p=>p.kind==='railing').length ||
-        count(IFC.IFCMEMBER) !== detailParts.filter(p=>p.kind==='member').length ||
+        count(IFC.IFCMEMBER) !== joinedStrings.length + detailParts.filter(p=>p.kind==='member').length ||
         count(IFC.IFCBUILDINGELEMENTPROXY) !== (separateTreads ? geometry.stringers.length + geometry.landings.length : 0) ||
         surfaceCount !== (surfaceTreads ? geometry.treads.length : 0) ||
         landingCount !== geometry.landings.length || count(IFC.IFCBEAM) !== frameObjects.length ||
