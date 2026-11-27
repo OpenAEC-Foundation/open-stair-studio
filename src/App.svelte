@@ -35,12 +35,13 @@
 
   import TimberDetailSheet from './TimberDetailSheet.svelte';
   import { addTimberTakeoff } from './timber-takeoff.js';
+  import { effectiveWel } from './timber-riser.js';
   import timberExample from '../examples/klassieke-eiken-kwartslag.oss.json';
 
   function freshDesign() {
     const project=structuredClone(starterProject);
     project.bim.modelId = crypto.randomUUID();
-    Object.assign(project.stair,newDesignDetails,{timberDetail:'modern',noseProfile:'round',railSide:'none',riserJoint:'housed'});
+    Object.assign(project.stair,newDesignDetails,{timberDetail:'modern',noseProfile:'round',railSide:'none',riserJoint:'housed',wel:0});
     return project;
   }
   let model = freshDesign();
@@ -187,7 +188,7 @@
   const referenceByStair = new WeakMap();
   function geometryFor(stair, timber) {
     const cache=timber?geometryByStair:referenceByStair;
-    if (!cache.has(stair)) cache.set(stair, generateStairGeometry(timber?stair:{...stair,riserJoint:'butt'}, { projectIsometric: false }));
+    if (!cache.has(stair)) cache.set(stair, generateStairGeometry(timber?stair:{...stair,riserJoint:'butt',wel:null}, { projectIsometric: false }));
     return cache.get(stair);
   }
   $: geometry = geometryFor(model.stair,timberSystem);
@@ -794,7 +795,12 @@
               {#if !dimensions.family.winder && (model.stair.stringerLeft==='cut'||model.stair.stringerRight==='cut')}<label for="stringer-overhang">Trederand t.o.v. keepboom (+ buiten, − binnen)</label><div class="numeric-input"><input id="stringer-overhang" type="number" min="-60" max="60" step="5" value={model.stair.stringerOverhang} onchange={e=>update('stringerOverhang',e.currentTarget)} /><span>mm</span></div>{/if}
             {:else}<p class="reference-note">De contour en referentiewangen bepalen de gereserveerde ruimte. Leg oplegging en productopbouw vast in Engineering.</p>{/if}
             <label for="stringer-depth">{dimensions.family.winder ? 'Verticale wanghoogte' : model.stair.stringerLeft==='cut'||model.stair.stringerRight==='cut' ? 'Minimale keepboomrug / boomhoogte' : 'Wanghoogte'}</label><div class="numeric-input"><input id="stringer-depth" type="number" min="100" max="1000" step="10" value={model.stair.stringerDepth} onchange={e => update('stringerDepth',e.currentTarget)} /><span>mm</span></div>
-            <label for="stringer-thickness">Wangdikte</label><div class="numeric-input"><input id="stringer-thickness" type="number" min="20" max="150" step="5" value={model.stair.stringerThickness} onchange={e => update('stringerThickness',e.currentTarget)} /><span>mm</span></div><label for="nosing">Tredepositie langs de looplijn (+ naar voren, − naar achteren)</label><div class="numeric-input"><input id="nosing" type="number" min="-60" max="100" step="5" value={model.stair.nosing} onchange={e => update('nosing', e.currentTarget)} /><span>mm</span></div>
+            <label for="stringer-thickness">Wangdikte</label><div class="numeric-input"><input id="stringer-thickness" type="number" min="20" max="150" step="5" value={model.stair.stringerThickness} onchange={e => update('stringerThickness',e.currentTarget)} /><span>mm</span></div>
+            <label for="nosing">Tredepositie langs de looplijn (+ naar voren, − naar achteren)</label><div class="numeric-input"><input id="nosing" type="number" min="-60" max="100" step="any" value={model.stair.nosing} onchange={e => update('nosing', e.currentTarget)} /><span>mm</span></div>
+            {#if timberSystem}
+              <label for="wel">{model.stair.riserBoards==='closed' ? 'Wel vóór het stootbord' : 'Tredeoverlap (wel)'}</label>
+              <div class="numeric-input"><input id="wel" type="number" min="0" max="100" step="any" value={effectiveWel(model.stair)} onchange={e => update('wel',e.currentTarget)} /><span>mm</span></div>
+            {/if}
           </div>
           <div class="property-section"><label for="tread-thickness">Trededikte</label><div class="numeric-input"><input id="tread-thickness" type="number" min="10" step="1" value={model.stair.treadThickness} onchange={e => update('treadThickness', e.currentTarget)} /><span>mm</span></div></div>
           {#if timberSystem}<StairDetailControls stair={model.stair} parts={details} {update} issue={invalidGeometry ?? (housingIssues[0] && {detail:housingIssues[0].message})}/>{/if}

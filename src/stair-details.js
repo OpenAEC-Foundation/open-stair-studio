@@ -1,6 +1,6 @@
 import { prism, tube } from './components/solids.js';
 import { treadClearanceIssue } from './stair-validity.js';
-import { housedRisers, nosingStrip, riserStock } from './timber-riser.js';
+import { effectiveWel, housedRisers, nosingStrip, riserPlaneOffset, riserStock } from './timber-riser.js';
 import { buildTimberBalustrade } from './timber-balustrade.js';
 
 export const detailDefaults = { railSide:'none', railHeight:950, riserBoards:'none', riserThickness:18,
@@ -188,7 +188,9 @@ function riserParts(stair,geometry) {
     if(height<=0) return;
     const nose=Number(stair.nosing)||0;
     const d=t.direction,normal={x:-d.y,y:d.x};
-    const frontRun=(t.step-1)*Number(stair.going)-nose,halfClear=Number(stair.width)/2-Number(stair.stringerThickness);
+    const manualInset=stair.wel!=null && stair.riserPosition==='manual' ? Number(stair.riserTopInset) : 0;
+    const frontRun=(t.step-1)*Number(stair.going)-nose+riserPlaneOffset(stair)-manualInset;
+    const halfClear=Number(stair.width)/2-Number(stair.stringerThickness);
     const centre={x:flight.origin.x+d.x*frontRun,y:flight.origin.y+d.y*frontRun};
     const a={x:centre.x-normal.x*halfClear,y:centre.y-normal.y*halfClear};
     const b={x:centre.x+normal.x*halfClear,y:centre.y+normal.y*halfClear};
@@ -226,13 +228,13 @@ function riserParts(stair,geometry) {
   for(const flight of geometry.flights) {
     const treads=geometry.treads.filter(t=>t.flightIndex===flight.index);
     for(const t of treads) {
-      const offset=housedRisers(stair)?stair.wellatWidth:Math.max(0,stair.nosing-stair.riserThickness);
+      const offset=stair.wel!=null ? effectiveWel(stair) : housedRisers(stair)?stair.wellatWidth:Math.max(0,stair.nosing-stair.riserThickness);
       if(geometry.dimensions.family.winder){
         const footprint=t.riserSeat?.points??strip(t.points,t.frontEdge[0],t.direction,0,stair.riserThickness);
         add(t.id+'-SB',footprint,t.elevation-rise,t.elevation-t.thickness,t.direction);
       } else addStraight(t,flight);
       if(stair.wellatType==='chamfered') {
-        const trim=nosingStrip(t,stair,strip,offset);
+        const trim=nosingStrip(t,stair,strip,offset,rise-t.thickness);
         if(trim) parts.push(trim);
       }
     }
@@ -254,7 +256,7 @@ function riserParts(stair,geometry) {
       if(direction.x*last.direction.x+direction.y*last.direction.y<0) direction={x:-direction.x,y:-direction.y};
       ref=a;
     } else {
-      const end=stair.going*flight.treadCount-(Number(stair.nosing)||0);
+      const end=stair.going*flight.treadCount-(Number(stair.nosing)||0)+riserPlaneOffset(stair);
       ref={x:flight.origin.x+flight.direction.x*end,
         y:flight.origin.y+flight.direction.y*end};
     }

@@ -3,8 +3,10 @@
   export let geometry;
   export let update;
   export let showPlan;
-  $: quarters = stair.type === 'half_winder' ? 2 : 1;
-  $: available = Math.max(0, stair.risers - 1 - quarters * stair.windersPerQuarter);
+  $: twoQuarter = stair.type === 'two_quarter_winder';
+  $: quarters = twoQuarter || stair.type === 'half_winder' ? 2 : 1;
+  $: straightSteps = stair.risers - 1 - quarters * stair.windersPerQuarter;
+  $: available = Math.max(0, straightSteps - (twoQuarter ? stair.middleSteps : 0));
   $: options = Array.from({ length: available + 1 }, (_, i) => i);
 </script>
 
@@ -22,7 +24,12 @@
   <label for="winder-count">Treden per 90° op de klimlijn</label>
   <input class="text-field" id="winder-count" type="number" min="2" max="8" step="1" value={stair.windersPerQuarter}
     onchange={e => update('windersPerQuarter', e.currentTarget)} />
-  <label for="entry-steps">Treden vóór de boog</label>
+  {#if twoQuarter}
+    <label for="middle-steps">Rechte treden tussen de kwartslagen</label>
+    <input class="text-field" id="middle-steps" type="number" min="1" max={Math.max(1,straightSteps - Math.max(0,stair.entrySteps))} step="1" value={stair.middleSteps}
+      onchange={e => update('middleSteps', e.currentTarget)} />
+  {/if}
+  <label for="entry-steps">{twoQuarter ? 'Rechte treden vóór de eerste kwartslag' : 'Treden vóór de boog'}</label>
   <select id="entry-steps" value={stair.entrySteps} onchange={e => update('entrySteps', e.currentTarget.value)}>
     <option value={-1}>Automatisch centreren</option>
     {#each options as count}<option value={count}>{count}</option>{/each}

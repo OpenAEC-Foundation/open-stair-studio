@@ -2,6 +2,12 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.22
+
+- Stel bij een houten trap de wel in millimeters in. Verplaats de hele trede langs de looplijn met de afzonderlijke maat **Tredepositie**. De stootborden, groeven en werkstukken volgen de gekozen aansluiting.
+- Kies onder **Trapfamilie** de **Tweekwartstrap met recht tussenstuk**. Stel de draairichting, de verdreven treden per kwart en de rechte treden tussen beide draaien in.
+- IFC4 en IFCX alpha bevatten de nieuwe trapfamilie. Bij gesloten houten trappen staat de wel als `NosingLength` op de trap en de vlucht. [Meetvergelijking met De Vries](https://github.com/OpenAEC-Foundation/open-stair-studio/blob/v0.13.22/docs/bim-referentietrappen.md) · [Voorbeeldprojecten en BIM-bestanden](https://github.com/OpenAEC-Foundation/open-stair-studio/raw/refs/tags/v0.13.22/examples/bim-tweekwart-vergelijking.zip)
+
 ## Nieuw in 0.13.21
 
 - De BIM-werkruimte leest de sparingen die aan een vloer zijn gekoppeld. Voor de twee openbare Archicad-modellen van KIT komen de tellingen overeen met IfcOpenShell. FZK-Haus heeft vier vloerplaten met één vloersparing, het Institute-model heeft 26 vloerplaten met vier vloersparingen.

@@ -19,13 +19,13 @@ const ranges = {
   floorHeight: [100, 10000], width: [300, 3000], going: [100, 600], risers: [2, 40],
   originX: [-1000000000, 1000000000], originY: [-1000000000, 1000000000], originZ: [-1000000000, 1000000000],
   originRotationDeg: [-360, 360],
-  windersPerQuarter: [2, 8], entrySteps: [-1, 39],
+  windersPerQuarter: [2, 8], middleSteps: [1, 35], entrySteps: [-1, 39],
   landingLength: [300, 5000], landingRiser: [0, 39], landingThickness: [20, 300], stringerThickness: [20, 150], stringerDepth: [100, 1000], stringerOverhang:[-60,60],
   landingFrameWidth: [40, 150], landingFrameDepth: [80, 300],
   landingScrewsPerJoint: [0, 4], landingScrewDiameter: [5, 12], landingScrewLength: [40, 250],
   landingScrewShearRd: [0, 1000], fastenerUnitPrice: [0, 1000],
   landingTimberE: [0, 30000], landingTimberFmRd: [0, 100], landingDeflectionRatio: [100, 1000],
-  nosing: [-60, 100], treadThickness: [10], wasteFactor: [1, 3], marginPercent: [0, 99]
+  nosing: [-60, 100], wel: [0, 100], treadThickness: [10], wasteFactor: [1, 3], marginPercent: [0, 99]
 };
 const labels = {
   ...Object.fromEntries(timberDimensions.map(f=>[f.key,f.label])), noseSize:'Profielmaat tredeneus',
@@ -33,13 +33,13 @@ const labels = {
   floorHeight: 'Vloerhoogte', width: 'Trapbreedte', going: 'Aantrede', risers: 'Aantal optredes',
   originX: 'Projectnulpunt X', originY: 'Projectnulpunt Y', originZ: 'Projectnulpunt Z',
   originRotationDeg: 'Rotatie projectassen',
-  windersPerQuarter: 'Treden per kwartslag', entrySteps: 'Treden vóór de boog',
+  windersPerQuarter: 'Treden per kwartslag', middleSteps: 'Rechte treden tussen de kwarten', entrySteps: 'Treden vóór de boog',
   landingLength: 'Bordeslengte', landingRiser:'Optrede op bordes', landingThickness: 'Bordesdikte', stringerThickness: 'Wangdikte', stringerDepth: 'Wanghoogte', stringerOverhang:'Trederand t.o.v. keepboom',
   landingFrameWidth: 'Bordesliggerbreedte', landingFrameDepth: 'Bordesliggerhoogte',
   landingScrewsPerJoint: 'Schroeven per stuiknaad', landingScrewDiameter: 'Schroefdiameter', landingScrewLength: 'Schroeflengte',
   landingScrewShearRd: 'Opgegeven schuifweerstand schroef', fastenerUnitPrice: 'Schroefprijs',
   landingTimberE: 'Elasticiteitsmodulus randligger', landingTimberFmRd: 'Buigsterkte randligger', landingDeflectionRatio: 'Doorbuigingscriterium',
-  nosing: 'Tredepositie langs looplijn', treadThickness: 'Trededikte', laneGap: 'Tussenruimte',
+  nosing: 'Tredepositie langs looplijn', wel: 'Wel', treadThickness: 'Trededikte', laneGap: 'Tussenruimte',
   riserTopInset:'Bovenaansluiting stootbord',riserBottomInset:'Onderaansluiting stootbord',
   wasteFactor: 'Zaag-/uitvalfactor', marginPercent: 'Brutomarge', laborRate: 'Uurtarief',
   overheadPercent: 'Opslag', laborHours: 'Werkuren', timberPricePerM3: 'Houtprijs',
@@ -76,9 +76,9 @@ function readField(section, key, value) {
     if (typeof value !== typeof prototype) throw new Error(`Ongeldige waarde voor ${section}.${key}.`);
     return value;
   }
-  if (value === null && (section === 'building' || key === 'headroom')) return null;
+  if (value === null && (section === 'building' || key === 'headroom' || (section === 'stair' && key === 'wel'))) return null;
   const label = labels[key] ?? key;
-  const integer = ['risers', 'windersPerQuarter', 'entrySteps', 'landingRiser', 'landingScrewsPerJoint'].includes(key);
+  const integer = ['risers', 'windersPerQuarter', 'middleSteps', 'entrySteps', 'landingRiser', 'landingScrewsPerJoint'].includes(key);
   if (!Number.isFinite(value) || (integer && !Number.isInteger(value))) {
     throw new Error(`${label} vereist een ${integer ? 'geheel' : 'geldig'} getal.`);
   }
@@ -172,7 +172,7 @@ export function editSession(session, section, key, value) {
   if(section==='stair'&&key==='riserPosition'&&value==='manual') model.stair.riserJoint='butt';
   // Surveyed widths refer to a particular stair layout. Undo restores both
   // the geometry and the measurements for that layout together.
-  if (section === 'stair' && ['width', 'stringerThickness', 'stringerLeft','stringerRight','stringerOverhang','type', 'turnDirection', 'outerShape', 'laneGap', 'going', 'risers', 'windersPerQuarter', 'entrySteps', 'nosing', 'landingLength','landingRiser'].includes(key)) {
+  if (section === 'stair' && ['width', 'stringerThickness', 'stringerLeft','stringerRight','stringerOverhang','type', 'turnDirection', 'outerShape', 'laneGap', 'going', 'risers', 'windersPerQuarter', 'middleSteps', 'entrySteps', 'nosing', 'wel', 'landingLength','landingRiser'].includes(key)) {
     model.engineering = { ...model.engineering, escapeWinderWidth: null };
     if (['type', 'width', 'stringerThickness'].includes(key)) model.engineering.escapeWidth = null;
   }

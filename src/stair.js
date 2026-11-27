@@ -2,7 +2,7 @@ import { geometryErrors } from './stair-validity.js';
 import { emptyWell } from './stairwell.js';
 import { detailDefaults } from './stair-details.js';
 import { timberDefaults } from './timber-settings.js';
-import { housedRisers } from './timber-riser.js';
+import { housedRisers, legacyFrontLip, riserPlaneOffset } from './timber-riser.js';
 import { buildStairViews } from './stair-views.js';
 import { buildLandingFrame } from './landing-frame.js';
 import { makeCutStringer } from './cut-stringer.js';
@@ -19,7 +19,8 @@ export const stairFamilies = [
   { id: 'landing', label: 'Bordestrap', icon: '⌞', flights: 2 },
   { id: 'half_turn', label: 'Halfslag met bordes', icon: '↶', flights: 2 },
   { id: 'quarter_winder', label: 'Kwartslag met verdreven treden', icon: '◴', flights: 1, winder: true },
-  { id: 'half_winder', label: 'Halfslag met verdreven treden', icon: '◑', flights: 1, winder: true }
+  { id: 'half_winder', label: 'Halfslag met verdreven treden', icon: '◑', flights: 1, winder: true },
+  { id: 'two_quarter_winder', label: 'Tweekwartstrap met recht tussenstuk', icon: '↶', flights: 1, winder: true }
 ];
 
 export const ruleProfiles = [
@@ -35,7 +36,7 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.21',
+  version: '0.13.22',
   stairEnabled: true,
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
@@ -61,7 +62,7 @@ export const starterProject = {
     landingScrewsPerJoint: 2, landingScrewDiameter: 8, landingScrewLength: 120, landingScrewShearRd: 0,
     landingTimberE: 0, landingTimberFmRd: 0, landingDeflectionRatio: 300,
     laneGap: 100, treadThickness: 40,
-    windersPerQuarter: 4, turnDirection: 'left', entrySteps: -1, outerShape: 'square',
+    windersPerQuarter: 4, turnDirection: 'left', entrySteps: -1, middleSteps: 5, outerShape: 'square',
     stringerDepth: 280, stringerThickness: 50,
     stringerLeft: 'housed', stringerRight: 'housed', stringerOverhang: 20,
     stringer: 'Prismatische boom · concept', finish: 'Natuur geolied'
@@ -156,8 +157,11 @@ export function generateStairGeometry(stair, options) {
   const treadOffset=(leftEdge+rightEdge)/2;
   const groovedRisers=housedRisers(stair);
   const rearSeat=groovedRisers ? Number(stair.riserThickness) : 0;
-  const frontLip=groovedRisers && stair.wellatType==='chamfered' ? Number(stair.wellatWidth) : 0;
-  const physicalRun=going+rearSeat+frontLip;
+  const rearOffset=riserPlaneOffset(stair), frontLip=legacyFrontLip(stair);
+  const effectiveDepth=going+rearOffset+frontLip;
+  const physicalRun=effectiveDepth+rearSeat;
+  const manualInset=stair.wel!=null && stair.riserBoards==='closed' && stair.riserPosition==='manual'
+    ? Number(stair.riserTopInset)+Number(stair.riserBottomInset) : 0;
   const treads = [];
   const stringers = [];
   const landings = [];
@@ -170,6 +174,9 @@ export function generateStairGeometry(stair, options) {
       const halfRun = scale(flight.direction, physicalRun / 2);
       const halfWidth = scale(normal, treadWidth / 2);
       const level = flight.firstRiser + step + 1;
+      // A leaning board takes up part of the upper walking surface of the
+      // preceding tread. The terminal landing/floor riser is vertical.
+      const visibleRun=effectiveDepth-(step+1<flight.treadCount?manualInset:0);
       const corners = [
         add(add(center, scale(halfRun, -1)), scale(halfWidth, -1)),
         add(add(center, halfRun), scale(halfWidth, -1)),
@@ -179,13 +186,13 @@ export function generateStairGeometry(stair, options) {
       treads.push({ id: `${stair.mark}-TD-${String(treads.length + 1).padStart(2, '0')}`,
         flightIndex: flight.index, step: step + 1, level, elevation: level * dimensions.rise,
         frontEdge: [corners[0], corners[3]], area: physicalRun * treadWidth,
-        goingAtWalkline: going, depthAtWalkline: going+frontLip, narrowDepth: going+frontLip,
+        goingAtWalkline: going, depthAtWalkline: visibleRun, narrowDepth: visibleRun,
         length: physicalRun, width: treadWidth, thickness,
         volume: (physicalRun * treadWidth * thickness) / 1e9,
         points: corners, svgPoints: pointString(corners), center, direction: flight.direction });
     }
     const entry = flight.index > 0 ? 1 : 0;
-    const run = (flight.treadCount+entry) * going;
+    const run = (flight.treadCount+entry) * going + rearOffset;
     const beamRise = (flight.treadCount+entry) * dimensions.rise;
     const length = Math.hypot(run, beamRise);
     const depth = Number(stair.stringerDepth) || 280;
@@ -204,7 +211,7 @@ export function generateStairGeometry(stair, options) {
       const origin = { ...add(beamStart, scale(down, depth / 2)), z: (flight.firstRiser + 1-entry) * dimensions.rise + down.z * depth / 2 };
       const frame = { origin, axis, sideAxis: { ...normal, z: 0 }, down };
       const startStation = -entry * going - (Number(stair.nosing) || 0);
-      const endStation = flight.treadCount * going - (Number(stair.nosing) || 0);
+      const endStation = flight.treadCount * going - (Number(stair.nosing) || 0) + rearOffset;
       const topStart = (flight.firstRiser + 1 - entry) * dimensions.rise;
       const topEnd = (flight.firstRiser + flight.risers) * dimensions.rise;
       const verticalDepth = depth * length / run;
@@ -276,20 +283,35 @@ export function generateStairGeometry(stair, options) {
     const boardWidth = Math.max(...points.map(point => point.y)) - Math.min(...points.map(point => point.y));
     const actual=stair.turnDirection==='right'&&stair.type!=='landing'?points.map(point=>({x:point.x,y:-point.y})):points;
     const landingThickness = Number(stair.landingThickness) || thickness;
+    const area=Math.abs(points.reduce((sum,p,i)=>{
+      const q=points[(i+1)%points.length];
+      return sum+p.x*q.y-p.y*q.x;
+    },0))/2;
     landings.push({ id, level, elevation: level * dimensions.rise, length, width: boardWidth, thickness: landingThickness,
-      volume: length * boardWidth * landingThickness / 1e9, points:actual, svgPoints: pointString(actual) });
+      area, volume: area * landingThickness / 1e9, blankVolume:length*boardWidth*landingThickness/1e9,
+      points:actual, svgPoints: pointString(actual) });
   };
   const firstFlight = dimensions.flights[0];
   const firstEnd = Math.max(0, firstFlight.risers - 1) * going;
   const nose = Number(stair.nosing) || 0;
-  const landingEntry = Math.min(firstEnd, firstEnd - nose);
-  const outgoingAllowance = Math.max(0,(Number(stair.riserThickness) || 0)-nose);
+  const landingEntry = stair.wel == null ? Math.min(firstEnd, firstEnd - nose) : firstEnd - nose;
+  const outgoingAllowance = Math.max(0,(Number(stair.riserThickness) || 0)+rearOffset-nose);
   if (stair.type === 'quarter_turn') {
     addLanding(`${stair.mark}-LB-01`, rectPoints(landingEntry, -width / 2, firstEnd + width, landingLength - width / 2 + outgoingAllowance), firstFlight.risers);
   } else if (stair.type === 'landing') {
     addLanding(`${stair.mark}-LB-01`, rectPoints(landingEntry, -width / 2, firstEnd + landingLength + outgoingAllowance, width / 2), firstFlight.risers);
   } else if (stair.type === 'half_turn') {
-    addLanding(`${stair.mark}-LB-01`, rectPoints(Math.min(landingEntry,firstEnd+nose-(Number(stair.riserThickness)||0)), -width / 2, firstEnd + landingLength, width + laneGap + width / 2), firstFlight.risers);
+    const outgoingEdge=firstEnd+nose-rearOffset-(stair.wel!=null && stair.riserBoards!=='closed' ? 0 : Number(stair.riserThickness)||0);
+    const farY=width+laneGap+width/2;
+    let points=rectPoints(Math.min(landingEntry,outgoingEdge),-width/2,firstEnd+landingLength,farY);
+    if(stair.wel!=null && Math.abs(landingEntry-outgoingEdge)>1e-7){
+      // The two lanes share a landing but run in opposite directions. Split
+      // their front edges midway through the gap so both nosings stay true.
+      const splitY=(width+laneGap)/2;
+      points=[{x:landingEntry,y:-width/2},points[1],points[2],{x:outgoingEdge,y:farY},
+        {x:outgoingEdge,y:splitY},{x:landingEntry,y:splitY}];
+    }
+    addLanding(`${stair.mark}-LB-01`,points,firstFlight.risers);
   }
   const frameAssemblies=landings.map(landing=>buildLandingFrame(landing,stair));
   const landingFrame=frameAssemblies.flatMap(frame=>frame.members);
@@ -313,7 +335,7 @@ export function generateStairGeometry(stair, options) {
     }))
   ];
   const volume = parts.reduce((sum, part) => sum + part.volume, 0);
-  const blankVolume = volume + stringers.reduce((sum, beam) => sum +
+  const blankVolume = volume + [...stringers,...landings].reduce((sum, beam) => sum +
     Math.max(0, (beam.blankVolume ?? beam.volume) - beam.volume), 0);
   return { dimensions, flights: dimensions.flights, treads, stringers, landings,
     landingFrame, landingJoints, landingFasteners, planBox, footprint, isoFaces, parts, volume, blankVolume };
@@ -365,7 +387,8 @@ export function inspectStair(model, geometry) {
       const compare = (label, value, limit) => addFinding(value < limit ? 'error' : 'ok',
         label, `${value} mm ter plaatse van de klimlijn. Profielminimum ${limit} mm.`, p.article);
       compare('Aantrede', Number(stair.going), p.minGoing);
-      compare('Tredevlak', Number(stair.going), p.minTreadDepth);
+      const {treads} = geometry ?? generateStairGeometry(stair);
+      compare('Tredevlak', Math.min(...treads.map(t=>t.depthAtWalkline)), p.minTreadDepth);
     }
     if (d.rise > p.maxRise) addFinding('error', 'Optrede groter dan profielmaximum', `${d.rise.toFixed(1)} mm is meer dan ${p.maxRise} mm.`, p.article);
     else addFinding('ok', 'Optrede voldoet aan profielgrens', `${d.rise.toFixed(1)} mm ≤ ${p.maxRise} mm.`, p.article);

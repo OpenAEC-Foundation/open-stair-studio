@@ -69,9 +69,9 @@ export function buildWorkshop(geometry, model, designDetails) {
   });
   const schedule = buildWinderSchedule(treads, beams);
   for (const landing of geometry.landings) {
-    schedule.parts.push({ ...landing, name: names.get(landing.id), kind: 'landing', quantity: 1, blankVolume: landing.volume });
+    schedule.parts.push({ ...landing, name: names.get(landing.id), kind: 'landing', quantity: 1, blankVolume: landing.blankVolume??landing.volume });
     schedule.volume += landing.volume;
-    schedule.blankVolume += landing.volume;
+    schedule.blankVolume += landing.blankVolume??landing.volume;
   }
   for (const member of geometry.landingFrame ?? []) {
     schedule.parts.push({...member,quantity:1,blankVolume:member.volume});

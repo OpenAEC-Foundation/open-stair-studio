@@ -1,5 +1,5 @@
 import { isWinder, winderIssues } from './winder.js';
-import { housedRisers } from './timber-riser.js';
+import { effectiveWel, housedRisers, riserPlaneOffset, wellatBackCut } from './timber-riser.js';
 
 export function treadClearanceIssue(stair, d, system='timber') {
   const free=d.rise-stair.treadThickness;
@@ -17,9 +17,15 @@ export function geometryErrors(stair, d, system='timber') {
   const add = (title, detail) => findings.push({ level: 'error', title, detail, reference: 'Geometrische invoer' });
   const clearance=treadClearanceIssue(stair,d,system);
   if(clearance) add(clearance.title,clearance.detail);
+  const availableWel=stair.wel!=null ? effectiveWel(stair) : housedRisers(stair) ? stair.wellatWidth : stair.nosing-stair.riserThickness;
+  if(stair.wel!=null && !(Number.isFinite(stair.wel) && stair.wel>=0 && stair.wel<=100))
+    add('Ongeldige wel','Kies een wel tussen 0 en 100 mm.');
   if(system==='timber' && stair.riserBoards==='closed' && stair.wellatType==='chamfered' &&
-    ((!housedRisers(stair) && stair.wellatWidth>stair.nosing-stair.riserThickness) || stair.wellatHeight>d.rise-stair.treadThickness))
+    (stair.wellatWidth>availableWel || stair.wellatHeight>d.rise-stair.treadThickness))
     add('Wellat past niet onder de trede','Controleer de breedte van de wel en de vrije hoogte tussen de treden.');
+  if(system==='timber' && stair.riserBoards==='closed' && stair.wellatType==='chamfered' &&
+    wellatBackCut(stair,d.rise-stair.treadThickness)>stair.wellatWidth-Math.min(3,stair.wellatWidth/2,stair.wellatHeight/2)+1e-7)
+    add('Wellat past niet tegen het schuine stootbord','De schuine achterzijde raakt de vellingkant. Kies een bredere of lagere wellat, of verminder de helling van het stootbord.');
   if(system==='timber' && ['round','bevel'].includes(stair.noseProfile) && !(stair.noseSize>0 && stair.noseSize<stair.treadThickness))
     add('Neusprofiel past niet in de trede','Kies een profielmaat tussen nul en de trededikte zodat er een rechte voorzijde onder het profiel blijft.');
   if (![stair.floorHeight, stair.width, stair.going, stair.risers].every(value => Number.isFinite(Number(value)) && Number(value) > 0)) {
@@ -34,11 +40,12 @@ export function geometryErrors(stair, d, system='timber') {
   if(system==='timber'&&stair.riserBoards==='closed'&&stair.riserPosition==='manual'&&!isWinder(stair.type)){
     const height=d.rise-Number(stair.treadThickness),top=Number(stair.riserTopInset),bottom=-Number(stair.riserBottomInset);
     const horizontalThickness=height>0?Number(stair.riserThickness)*Math.hypot(1,(top-bottom)/height):Infinity;
-    if(Number(stair.riserBottomInset)<horizontalThickness)
+    const bottomSetback=Number(stair.riserBottomInset)+(stair.wel!=null?top:0);
+    if(bottomSetback<horizontalThickness)
       add('Stootbord steekt voorbij ondertrede','De onderaansluiting moet minstens de stootborddikte binnen de achterrand van de ondertrede liggen.');
-    if(top+horizontalThickness>Number(stair.going))
+    if((stair.wel!=null?0:top)+horizontalThickness>Number(stair.going))
       add('Stootbord past niet onder boventrede','Verklein de bovenaansluiting of vergroot de trede zodat het stootbord onder de trede past.');
-    if(Number(stair.riserBottomInset)>Number(stair.going))
+    if(bottomSetback>Number(stair.going)+riserPlaneOffset(stair))
       add('Stootbord mist ondertrede','De onderaansluiting ligt vóór de onderste trede. Verklein de ondermaat of vergroot de trede.');
   }
   if((stair.stringerLeft==='cut'||stair.stringerRight==='cut') &&

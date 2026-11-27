@@ -1,6 +1,7 @@
 import { tessellate } from './ifc-tessellate.js';
 import { compressedModelGuid, ifcModelId } from './ifc-identity.js';
 import { stairMeasureProperties } from './ifc-stair-properties.js';
+import { effectiveWel } from './timber-riser.js';
 import * as IFC from 'web-ifc';
 import { inspectStair } from './stair.js';
 import { defaultEngineering, deriveEngineering } from './engineering.js';
@@ -16,7 +17,8 @@ const stairTypes = {
   landing: 'TWO_STRAIGHT_RUN_STAIR',
   half_turn: 'HALF_TURN_STAIR',
   quarter_winder: 'QUARTER_WINDING_STAIR',
-  half_winder: 'HALF_WINDING_STAIR'
+  half_winder: 'HALF_WINDING_STAIR',
+  two_quarter_winder: 'TWO_QUARTER_WINDING_STAIR'
 };
 
 export function createIfc4WithApi(api, model, geometry) {
@@ -113,8 +115,8 @@ function writeModel(api, sid, model, geometry) {
   const windingFlight = d.family.winder === true;
   const stairElement = e(IFC.IFCSTAIR, guid('stair'), null, label(`${stair.mark} · ${stair.name}`), text('Open Stair Studio · conceptmodel; niet voor productie of vergunningstoets'), label(stair.type), stairPlacement, null, identifier(stair.mark), enumValue(stairType));
   const millimetre = unit('LENGTHUNIT', 'MILLI', 'METRE');
-  const singleProperty = ([name, type, value, propertyUnit]) => e(IFC.IFCPROPERTYSINGLEVALUE, identifier(name), null,
-    api.CreateIfcType(sid, type, value), propertyUnit ?? (type === IFC.IFCLENGTHMEASURE ? millimetre : null));
+  const singleProperty = ([name, type, value, propertyUnit = type === IFC.IFCLENGTHMEASURE ? millimetre : null]) =>
+    e(IFC.IFCPROPERTYSINGLEVALUE, identifier(name), null, api.CreateIfcType(sid, type, value), propertyUnit);
   const technicalProperties = [
     ['TreadSystem', IFC.IFCLABEL, dossier.structureLabel],
     ['SupportArrangement', IFC.IFCLABEL, dossier.supportLabel],
@@ -148,6 +150,12 @@ function writeModel(api, sid, model, geometry) {
     ['FloorToFloorHeight_mm', IFC.IFCLENGTHMEASURE, stair.floorHeight],
     ['OverallWidth_mm', IFC.IFCLENGTHMEASURE, stair.width], ['ClearTreadWidth_mm', IFC.IFCLENGTHMEASURE, d.clearWidth ?? geometry.treads[0].width], ['RiserCount', IFC.IFCINTEGER, d.risers],
     ['RiserHeight_mm', IFC.IFCLENGTHMEASURE, d.rise], ['Going_mm', IFC.IFCLENGTHMEASURE, stair.going],
+    ['TreadPositionAlongWalkingLine_mm', IFC.IFCLENGTHMEASURE, stair.nosing],
+    ...(!engineeredTreads ? [['DesignedNosingProjection_mm', IFC.IFCLENGTHMEASURE, effectiveWel(stair)]] : []),
+    ...(stair.type === 'two_quarter_winder' ? [
+      ['MiddleStraightTreads', IFC.IFCINTEGER, d.middleSteps],
+      ['MiddleStraightRun_mm', IFC.IFCLENGTHMEASURE, d.middleSteps * stair.going]
+    ] : []),
     ['TreadCount', IFC.IFCINTEGER, d.treadCount],
     ...(joined ? [
       ['RiserJoint', IFC.IFCLABEL, 'Stootbord met gefreesde aansluiting'],
@@ -229,10 +237,13 @@ function writeModel(api, sid, model, geometry) {
     if (!windingFlight && !joined) {
       return boxSolid(tread.center, tread.direction, tread.length, tread.width, tread.thickness, baseZ);
     }
-    const vertices = tread.points.map(p => e(IFC.IFCCARTESIANPOINT, [length(p.x), length(p.y)]));
+    return polygonPrism(tread);
+  }
+  function polygonPrism(part) {
+    const vertices = part.points.map(p => e(IFC.IFCCARTESIANPOINT, [length(p.x), length(p.y)]));
     const contour = e(IFC.IFCPOLYLINE, [...vertices, vertices[0]]);
-    const profile = e(IFC.IFCARBITRARYCLOSEDPROFILEDEF, enumValue('AREA'), label(tread.id), contour);
-    return e(IFC.IFCEXTRUDEDAREASOLID, profile, axis3([0, 0, mm(baseZ)]), direction([0, 0, 1]), length(tread.thickness));
+    const profile = e(IFC.IFCARBITRARYCLOSEDPROFILEDEF, enumValue('AREA'), label(part.id), contour);
+    return e(IFC.IFCEXTRUDEDAREASOLID, profile, axis3([0, 0, mm(part.elevation - part.thickness)]), direction([0, 0, 1]), length(part.thickness));
   }
   function slopedBeamSolid(beam) {
     const { origin, axis, sideAxis } = beam.frame;
@@ -320,6 +331,8 @@ function writeModel(api, sid, model, geometry) {
   }
   function addStairMeasures(object, name, risers, treads) {
     const fields = stairMeasureProperties({risers, treads, rise:mm(d.rise), going:windingFlight ? null : mm(stair.going)});
+    if (!engineeredTreads && stair.riserBoards === 'closed')
+      fields.push(['NosingLength', IFC.IFCLENGTHMEASURE, mm(effectiveWel(stair)), null]);
     const pset = e(IFC.IFCPROPERTYSET, guid('pset', name, object.GlobalId.value), null, label(name), null, fields.map(singleProperty));
     partRelations.push(relationship(IFC.IFCRELDEFINESBYPROPERTIES, [object], pset));
   }
@@ -417,7 +430,9 @@ function writeModel(api, sid, model, geometry) {
     const minX = Math.min(...landing.points.map(p => p.x)), maxX = Math.max(...landing.points.map(p => p.x));
     const minY = Math.min(...landing.points.map(p => p.y)), maxY = Math.max(...landing.points.map(p => p.y));
     const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
-    const solid = boxSolid(center, { x: 1, y: 0 }, maxX - minX, maxY - minY, landing.thickness, landing.elevation - landing.thickness);
+    const solid = landing.points.length === 4
+      ? boxSolid(center, { x: 1, y: 0 }, maxX - minX, maxY - minY, landing.thickness, landing.elevation - landing.thickness)
+      : polygonPrism(landing);
     const slab = engineeredTreads ? reservation(landing.id, 'bordes', solid, stairPlacement) :
       e(IFC.IFCSLAB, partGuid(landing.id), null, label(landing.id), text('Trapbordes · conceptplaat'), label('Landing'),
       localPlacement(stairPlacement), finishedBody(landing.id, solid), identifier(landing.id), enumValue('LANDING'));

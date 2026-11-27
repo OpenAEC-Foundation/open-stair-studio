@@ -98,6 +98,6 @@ if __name__ == '__main__':
     with TemporaryDirectory(prefix='oss-ifc-') as temporary:
         subprocess.run(['node', 'scripts/verify-stair.mjs', '--fixtures', temporary], cwd=root, check=True)
         cases = sorted(Path(temporary).glob('*.ifc'))
-        assert len(cases) == 12
+        assert len(cases) == 16
         for case in cases:
             verify_export(case, settings)

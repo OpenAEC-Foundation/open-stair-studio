@@ -87,7 +87,7 @@ function segmentGap(a, b, c, d) {
 
 // A tapered tread (including the roots of its stringer tongues) can be
 // concave. A groove must survive cutting that final outline from the blank.
-function insideFinishedContour(mouth, contour) {
+export function insideFinishedContour(mouth, contour) {
   const p=mouth[0];
   let inside=false;
   for (let i=0;i<contour.length;i++) {

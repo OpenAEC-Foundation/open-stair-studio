@@ -6,7 +6,7 @@ export function checkLandingJoints(model,geometry) {
   const fasteners=geometry.landingFasteners??[];
   if(!landing||!joints.length)return {status:'not-applicable',reasons:[],fasteners:0};
   const reasons=[];
-  const areaM2=landing.length*landing.width/1e6;
+  const areaM2=(landing.area??landing.length*landing.width)/1e6;
   const areaLoad=model.engineering?.loadArea;
   const pointLoad=model.engineering?.loadPoint;
   if(areaLoad==null||pointLoad==null)reasons.push('Vul de vlaklast en de puntlast in het Engineeringdossier in.');

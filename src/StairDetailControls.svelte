@@ -1,5 +1,6 @@
 <script>
   import {timberDimensions,timberStyles,noseNames} from './timber-settings.js';
+  import {isWinder} from './winder.js';
   export let stair;
   export let parts = [];
   export let update;
@@ -50,17 +51,17 @@
     {/if}
     <label for="stair-riser-thickness">Dikte stootbord (mm)</label>
     <input id="stair-riser-thickness" class="text-field" type="number" min="8" max="42" value={stair.riserThickness} onchange={e=>update('riserThickness',e.currentTarget)} />
-    {#if !['quarter_winder','half_winder'].includes(stair.type)}
+    {#if !isWinder(stair.type)}
       <label for="stair-riser-position">Aansluiting stootbord</label>
       <select id="stair-riser-position" value={stair.riserPosition??'auto'} onchange={e=>update('riserPosition',e.currentTarget.value)}>
         <option value="auto">Verticaal · standaard aansluiting</option><option value="manual">Schuin · afwijkend maatwerk</option>
       </select>
     {/if}
-    {#if stair.riserPosition==='manual' && !['quarter_winder','half_winder'].includes(stair.type)}
+    {#if stair.riserPosition==='manual' && !isWinder(stair.type)}
       <small>Deze afwijkende stand maakt het stootbord bewust schuin. Kies ‘Verticaal’ voor een recht stootbord.</small>
-      <label for="stair-riser-top">Bovenzijde achter tredevoorzijde (mm)</label>
+      <label for="stair-riser-top">{stair.wel == null ? 'Bovenzijde achter tredevoorzijde' : 'Referentiemaat boven voor de helling'} (mm)</label>
       <input id="stair-riser-top" class="text-field" type="number" min="0" max="80" value={stair.riserTopInset} onchange={e=>update('riserTopInset',e.currentTarget)} />
-      <label for="stair-riser-bottom">Onderzijde vóór achterrand ondertrede (mm)</label>
+      <label for="stair-riser-bottom">{stair.wel == null ? 'Onderzijde vóór achterrand ondertrede' : 'Referentiemaat onder voor de helling'} (mm)</label>
       <input id="stair-riser-bottom" class="text-field" type="number" min={stair.riserThickness} max="100" value={stair.riserBottomInset} onchange={e=>update('riserBottomInset',e.currentTarget)} />
     {/if}
     <label for="wood-wellat">Wellat onder de neus</label><select id="wood-wellat" value={stair.wellatType} onchange={e=>update('wellatType',e.currentTarget.value)}><option value="none">Geen</option><option value="chamfered">Met vellingkant</option></select>

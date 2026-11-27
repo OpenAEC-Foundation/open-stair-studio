@@ -1,3 +1,5 @@
+import { housedRisers, riserPlaneOffset } from './timber-riser.js';
+
 // An optional rectangular timber rim under a landing plate. The members meet
 // at four butt joints; host anchors require a separate project detail.
 const rectangle = (x0, y0, x1, y1) => [
@@ -6,14 +8,16 @@ const rectangle = (x0, y0, x1, y1) => [
 
 export function buildLandingFrame(landing, stair) {
   if (stair.landingFrame !== 'perimeter') return {members:[], joints:[], fasteners:[]};
-  const plateMinX = Math.min(...landing.points.map(p=>p.x));
+  // The half-turn landing can have a stepped front edge. Keep the entire
+  // rectangular frame under both lanes.
+  const maxX = Math.max(...landing.points.map(p=>p.x));
+  const plateMinX = Math.max(...landing.points.filter(p=>p.x<maxX).map(p=>p.x));
   // The incoming flight of each straight/quarter/return landing climbs in
   // +X. Carry the two side rails and the front cross member behind the riser
   // as one rectangular frame, so the same butt joints and screws still fit.
-  const housedRiser = stair.riserJoint==='housed' && stair.riserBoards==='closed' && stair.riserPosition!=='manual';
-  const riserBack = (landing.level-1)*Number(stair.going)-(Number(stair.nosing)||0)+Number(stair.riserThickness);
-  const minX = housedRiser ? Math.max(plateMinX,riserBack) : plateMinX;
-  const maxX = Math.max(...landing.points.map(p=>p.x));
+  const behindRiser = housedRisers(stair) || (stair.wel!=null && stair.riserBoards==='closed');
+  const riserBack = (landing.level-1)*Number(stair.going)-(Number(stair.nosing)||0)+riserPlaneOffset(stair)+Number(stair.riserThickness);
+  const minX = behindRiser ? Math.max(plateMinX,riserBack) : plateMinX;
   const minY = Math.min(...landing.points.map(p=>p.y));
   const maxY = Math.max(...landing.points.map(p=>p.y));
   const w = Number(stair.landingFrameWidth);

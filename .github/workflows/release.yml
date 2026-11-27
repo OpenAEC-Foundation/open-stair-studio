@@ -47,6 +47,15 @@ jobs:
           python scripts/audit-riser-ifc.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/verify-ifcx-independent.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $comparison = Join-Path $env:RUNNER_TEMP 'wel-tweekwart'
+          node scripts/export-wel-tweekwart.mjs $comparison
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/measure-wel-tweekwart.py --verify-exports $comparison
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/export-wel-tweekwart.mjs $comparison --bordessen
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/verify-wel-landing.py $comparison
         shell: pwsh
       - name: Build signed Windows installer and updater artifact
         env:

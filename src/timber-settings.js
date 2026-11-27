@@ -6,7 +6,7 @@ export const timberDimensions = [
   {key:'handrailDepth', label:'Hoogte handlijst', min:32, max:95, value:58}
 ];
 export const timberDefaults = {
-  timberDetail:'basic', noseProfile:'square', noseSize:8, wellatType:'none', wellatWidth:6,wellatHeight:16,
+  timberDetail:'basic', noseProfile:'square', noseSize:8, wel:null, wellatType:'none', wellatWidth:6,wellatHeight:16,
   ...Object.fromEntries(timberDimensions.map(f=>[f.key,f.value]))
 };
 export const timberStyles = {basic:'Basis · ronde greep en metalen spijlen',classic:'Klassiek · gedraaid hout',modern:'Modern · verjongd hout'};

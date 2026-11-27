@@ -52,7 +52,8 @@ function verifyIfcValues(api, modelId, model, geometry) {
   assert.equal(projectLength.Prefix, null);
 
   const stair = entities(IFC.IFCSTAIR)[0];
-  const windingType = { quarter_winder: 'QUARTER_WINDING_STAIR', half_winder: 'HALF_WINDING_STAIR' }[model.stair.type];
+  const windingType = { quarter_winder: 'QUARTER_WINDING_STAIR', half_winder: 'HALF_WINDING_STAIR',
+    two_quarter_winder: 'TWO_QUARTER_WINDING_STAIR' }[model.stair.type];
   if (windingType) assert.equal(stair.PredefinedType.value, windingType);
   const [storeyRelation] = entities(IFC.IFCRELCONTAINEDINSPATIALSTRUCTURE);
   assert.deepEqual(storeyRelation.RelatedElements.map(item => item.value), [stair.expressID]);
@@ -80,7 +81,9 @@ function verifyIfcValues(api, modelId, model, geometry) {
     OverallWidth_mm: model.stair.width,
     ClearTreadWidth_mm: model.stair.width - 2 * model.stair.stringerThickness,
     RiserHeight_mm: geometry.dimensions.rise,
-    Going_mm: model.stair.going
+    Going_mm: model.stair.going,
+    TreadPositionAlongWalkingLine_mm: model.stair.nosing,
+    DesignedNosingProjection_mm: 0
   })) {
     const prop = properties.find(item => item.Name.value === name);
     const unit = line(prop.Unit);

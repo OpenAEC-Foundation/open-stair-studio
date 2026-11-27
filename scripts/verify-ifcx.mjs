@@ -12,9 +12,10 @@ await api.Init();
 const destination = process.argv[2];
 const source = node => node.attributes['openaec::ifc4'];
 const meshOf = node => node.attributes['usd::usdgeom::mesh'];
-let meshes = 0, products = 0;
+let meshes = 0, products = 0, models = 0;
 
 function check(name, bytes) {
+  models++;
   const layer = JSON.parse(JSON.stringify(createIfcxWithApi(api, bytes)));
   assert.equal(layer.header.ifcxVersion, 'ifcx_alpha');
   const byPath = new Map(layer.data.map(node => [node.path,node]));
@@ -62,15 +63,26 @@ function check(name, bytes) {
 }
 
 for (const [type,hand,nose] of [['straight','left',25],['quarter_turn','left',-25],
-  ['quarter_winder','left',100], ['quarter_winder','right',-60], ['half_winder','left',-60], ['half_winder','right',100]]) {
+  ['quarter_winder','left',100], ['quarter_winder','right',-60], ['half_winder','left',-60], ['half_winder','right',100],
+  ['two_quarter_winder','left',15], ['two_quarter_winder','right',-15]]) {
   const model = structuredClone(starterProject);
   Object.assign(model.stair,{type,turnDirection:hand,nosing:nose,riserJoint:'housed',riserBoards:'closed',railSide:'none',nlsfbCode:'24.1'});
+  if (type === 'two_quarter_winder') Object.assign(model.stair,{wel:45,middleSteps:5,windersPerQuarter:5,risers:16});
   Object.assign(model.bim,{originX:15000,originY:-3600,originZ:3200,originRotationDeg:33});
   const bytes = createIfc4WithApi(api,model,generateStairGeometry(model.stair)).bytes;
   const layer = check([type,hand,nose].join('-'),bytes);
   assert(layer.data.some(node => source(node).connections?.length));
   assert(layer.data.some(node => source(node).classifications?.length));
   assert(layer.data.some(node => source(node).propertySets));
+  if (type === 'two_quarter_winder') {
+    const properties = kind => source(layer.data.find(node => node.attributes['bsi::ifc::class'].code === kind)).propertySets;
+    const {Pset_StairCommon:common, Pset_OpenStairStudio_Design:design} = properties('IfcStair');
+    assert.equal(common.NosingLength.value, .045);
+    assert.equal(properties('IfcStairFlight').Pset_StairFlightCommon.NosingLength.value, .045);
+    assert.equal(design.MiddleStraightTreads.value, 5);
+    assert.equal(design.DesignedNosingProjection_mm.value, 45);
+    assert.equal(design.TreadPositionAlongWalkingLine_mm.value, nose);
+  }
   assert(layer.data.some(node => node.attributes['bsi::ifc::prop::TypeName']));
   const firstTread = layer.data.find(node => source(node).Tag === model.stair.mark+'-TD-01');
   const top = Math.max(...meshOf(firstTread).points.map(p=>p[2]));
@@ -91,4 +103,4 @@ const combined = check('aansluitingen',await createStairwellIfc(steelGlass.proje
 const group = combined.data.find(node => node.attributes['bsi::ifc::class'].code === 'IfcGroup');
 assert(group && source(group).propertySets.OSS_Verbinding);
 assert(source(group).assignments.some(a => a.type === 'IfcRelAssignsToGroup'));
-console.log('IFCX alpha: 8 modellen, '+products+' fysieke en ruimtelijke IFC-producten, '+meshes+' meshes gevalideerd.');
+console.log('IFCX alpha: '+models+' modellen, '+products+' fysieke en ruimtelijke IFC-producten, '+meshes+' meshes gevalideerd.');

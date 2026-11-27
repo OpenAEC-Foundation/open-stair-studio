@@ -77,6 +77,42 @@ def check(page, download):
             panel.get_by_text(counts, exact=True).wait_for(timeout=60000)
             print(f'{filename}: {counts}', flush=True)
 
+    page.locator('#family').select_option('two_quarter_winder')
+    def set_mm(selector, value):
+        field = page.locator(selector)
+        field.fill(str(value))
+        field.press('Tab')
+        assert float(field.input_value()) == value, selector
+
+    set_mm('#wel', 45)
+    set_mm('#winder-count', 5)
+    set_mm('#middle-steps', 4)
+    set_mm('#middle-steps', 5)
+    page.locator('#entry-steps').select_option('0')
+    for hand, position in [('left', -15), ('right', 15)]:
+        mark = 'TK-' + hand.upper()
+        page.locator('#turn-direction').select_option(hand)
+        page.locator('#stair-mark').fill(mark)
+        set_mm('#nosing', position)
+        assert page.locator('#wel').input_value() == '45'
+        saved = download('Opslaan', '.oss.json')
+        saved_stair = json.loads(saved.read_text(encoding='utf-8'))['stair']
+        assert [saved_stair[k] for k in ('type', 'turnDirection', 'middleSteps', 'wel', 'nosing')] == [
+            'two_quarter_winder', hand, 5, 45, position]
+        project_file.set_input_files(saved)
+        page.get_by_text(f'{mark} · Dichte steektrap', exact=True).first.wait_for()
+        bim.click()
+        result = verify_download_pair(download(panel.get_by_role('button', name='IFC4 exporteren'), '.ifc'),
+                                      download(panel.get_by_role('button', name='IFCX alpha exporteren'), '.ifcx'), {mark})
+        stair, = result.by_type('IfcStair')
+        flight, = result.by_type('IfcStairFlight')
+        assert stair.PredefinedType == 'TWO_QUARTER_WINDING_STAIR' and flight.PredefinedType == 'WINDER'
+        assert element.get_pset(stair, 'Pset_StairCommon')['NosingLength'] == .045
+        assert element.get_pset(flight, 'Pset_StairFlightCommon')['NosingLength'] == .045
+        design = element.get_pset(stair, 'Pset_OpenStairStudio_Design')
+        assert design['DesignedNosingProjection_mm'] == 45
+        assert (design['MiddleStraightTreads'], design['TurnDirection'], design['TreadPositionAlongWalkingLine_mm']) == (5, hand, position)
+
     config = json.loads((EXAMPLES / 'zes-trapontwerpen.oss.json').read_text(encoding='utf-8'))
     items = [i for i in config['stairwell']['instances'] if i['type'] in ('portable', 'ladder')]
     assert len(items) == 2

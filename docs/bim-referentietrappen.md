@@ -24,7 +24,7 @@ Het gesloten model bevat vijftien volle tredebladen van 265 × 804 × 38 mm, een
 
 Bij de eerste trede ligt de voorkant op wereld-X 3358 mm en het zichtvlak van het onderliggende stootbord op 3313 mm. Bij de tweede liggen die vlakken op 3138 en 3093 mm. **De gemeten wel is beide keren 45 mm** en de afstand van neus tot neus is 220 mm. De bovenzijde van het eerste stootbord en de onderzijde van de eerste trede liggen op dezelfde Z van −2850,5 mm. Het volgende stootbord ligt met zijn zichtvlak op X 3093 mm tegen de achterkant van de eerste trede. De modellen geven hiermee een referentie voor positie en contactvlakken. Freesdiepte en passingstolerantie zijn in deze IFC niet gespecificeerd. [IFC gesloten steektrap](https://www.devriestrappen.nl/friksbeheer/wp-content/uploads/2019/09/Steektrap-dicht-3300x900-IFC.zip)
 
-## Vergelijking met eigen IFC4-uitvoer
+## Eerdere vergelijking met de steektrap, kwartslag en doorlopende halfslag
 
 Het [vergelijkingsproject](../examples/bim-steektrap-vergelijking.oss.json) is via `readProject` ingelezen en via dezelfde geometrie- en IFC4-functies als in de toepassing geëxporteerd. Voor de drie onderstaande paren zijn de zes IFC-bestanden opnieuw geopend en getrianguleerd. De eigen bestanden bevatten elk één `IfcStair` met één `IfcStairFlight`, vijftien tredebladen en zestien stootborden. Alle 123 eigen onderdelen met geometrie konden worden gemeten.
 
@@ -43,6 +43,37 @@ Het [vergelijkingsproject](../examples/bim-steektrap-vergelijking.oss.json) is v
 **Aansluiting op de vloer, vóór en na correctie.** In de eerste eigen IFC-uitvoer staken de twee onderste wangsegmenten (`ST-01-WG-L1` en `ST-01-WG-R1`) bij de kwartslag 92,5 mm en bij de halfslag 98,75 mm onder de startvloer uit. Bij de fabrikant eindigen beide bomen op de startvloer. Na correctie van de zaagsnede in het trapmodel zijn de eigen kwart- en halfslag linksom én rechtsom opnieuw geëxporteerd. De acht onderzochte wangvoeten eindigen nu op Z = 0,00 mm. De tabel toont de nagemeten eindmaten. De hogere Z-maat van de tweekwart bij De Vries is terug te voeren op een spil die 1050 mm boven de verdiepingsvloer uitkomt.
 
 **Linksom en rechtsom.** Na spiegelen over het XZ-vlak zijn alle unieke meshpunten uit de eigen IFC-bestanden vergeleken op een afronding van 0,0001 mm. Bij de kwartslag kwamen alle 254 punten overeen en bij de halfslag alle 290. De fabrikantvergelijking gebruikt de beschikbare linker modellen.
+
+## Onafhankelijke wel en tweekwart met rechte tussenloop
+
+Bij de gesloten tweekwart van De Vries zijn de zestien stootborden op hoogte gesorteerd. Hun voorvlakken draaien achtereenvolgens 18,53°, 18,81°, 17,92°, 18,04° en 16,70°, blijven vijf intervallen evenwijdig en draaien vervolgens 17,64°, 17,75°, 16,95°, 18,73° en 18,94°. Elk kwart draait in totaal 90°. Alle vijftien volle treden hebben 45,00 mm wel en de vijf rechte bladen meten tussen hun lange evenwijdige zijden 265,512 tot 265,513 mm. Bij de rechte referentietrap zijn die bladen 265,00 mm diep. [Gesloten tweekwart van De Vries](https://www.devriestrappen.nl/friksbeheer/wp-content/uploads/2019/09/Tweekwart-Dicht-3160x1000-IFC.zip) · [Gesloten steektrap van De Vries](https://www.devriestrappen.nl/friksbeheer/wp-content/uploads/2019/09/Steektrap-dicht-3300x900-IFC.zip)
+
+De meetproef gebruikt de begrenzing van het hoogste horizontale vlak van elk blad en stootbord. De IFC4-mesh wordt opgebouwd met IfcOpenShell. Voor IFCX leest de proef de geëxporteerde driehoeken rechtstreeks uit. Gedeelde driehoeksranden vervallen vóór het bepalen van de bordrichting en de projectie van de neus op de plaatselijke normaal. De hoek tussen twee opeenvolgende borden meet de verdeling van de draai. De omhulling omvat ook de bomen en eventuele spillen. [Meetscript](../scripts/measure-wel-tweekwart.py)
+
+| Meting bij tredepositie 0 mm | Studio, gesloten steek | De Vries, gesloten steek | Studio, gesloten tweekwart links / rechts | De Vries, gesloten tweekwart links |
+| --- | ---: | ---: | ---: | ---: |
+| Producten met eigen geometrie | 33 | 34 | 48 / 48 | 38 |
+| Lange × korte zijde van de omhulling (mm) | 3358 × 880 | 3378 × 880 | 3472,394 × 1242,915 | 3140 × 992,105 |
+| Hoogte van de omhulling (mm) | 3000 | 3000 | 2900 | 3950 |
+| Draaiende / rechte / draaiende intervallen | 0 / 15 / 0 | 0 / 15 / 0 | 5 / 5 / 5 | 5 / 5 / 5 |
+| Wel op alle 15 bladen (mm) | 45 | 45 | 45 | 45 |
+
+![Twee linkse tweekwarttrappen op gelijke schaal. Studio meet 3472,4 × 1242,9 mm en De Vries 3140,0 × 992,1 mm. De vijf rechte tussenintervallen zijn groen.](vergelijking-tweekwart-links.png)
+
+Beide plattegronden staan op dezelfde schaal. De trap begint rechtsonder bij trede 1, draait linksom en eindigt linksonder bij trede 15. De donkere lijnen volgen de vijftien gemeten tredevoorranden. De korte streeplijn bij de uitgang markeert het zichtvlak van het zestiende stootbord. De lichte zijcontour verbindt de meetpunten en de maatlijnen horen bij de omhulling van alle gemodelleerde onderdelen. [Figuur uit IFC genereren](../scripts/plot-two-quarter.py) · [IFC van De Vries](https://www.devriestrappen.nl/friksbeheer/wp-content/uploads/2019/09/Tweekwart-Dicht-3160x1000-IFC.zip)
+
+De drie tredeposities verschuiven het middelpunt van het eerste stootbord van de eigen steektrap langs X naar respectievelijk 66,5, 51,5 en 36,5 mm. De wel blijft bij alle 270 metingen aan de negen IFC4/IFCX-paren 45,00 mm. De rechte steektrapbladen meten 265 mm. De eigenschap `NosingLength` op zowel de trap als de vlucht geeft in beide uitwisselformaten 0,045 m.
+
+Het eigen ontwerp verdeelt elk kwart over 15,86°, 18,82°, 20,65°, 18,82° en 15,86°. Rechte aantrede en bladdiepte in het midden zijn bij beide ontwerpen circa 220,513 en 265,513 mm. De eigen omhulling bij positie nul is aan de lange kant 332,394 mm en aan de korte kant 250,810 mm groter. De spil van de fabrikant steekt 1050 mm boven de verdieping uit. De vijf rechte tussenintervallen en de wel komen overeen, maar het eigen ontwerp vraagt een andere plattegrond.
+
+De fabrikant-ZIP's voor de gesloten steektrap en tweekwart bevatten elk één IFC met suffix `-L.IFC`. Voor de eigen tweekwart zijn links en rechts apart geëxporteerd en over het XZ-vlak vergeleken. Alle unieke meshpunten kwamen bij elk van de drie posities in zowel IFC4 als IFCX na spiegeling overeen op 0,01 mm afronding. De twee ontwerpen op positie nul zijn beschikbaar als bewerkbaar project, IFC4 en IFCX. [Vergelijkingsbundel links en rechts](../examples/bim-tweekwart-vergelijking.zip)
+
+De exportproef gebruikt zestien optredes, een wel van 45 mm en tredeposities −15, 0 en +15 mm. De tweekwart gebruikt vijf treden per kwart, vijf recht ertussen, nul vóór de eerste boog, een breedte van 966 mm, een vloerhoogte van 2900 mm en een aantrede van 220,513 mm. Met de volgende opdrachten zijn de negen modelparen opnieuw te maken en te meten. Vervang de fabrikantpaden door de uitgepakte bestanden uit de twee ZIP-archieven.
+
+```powershell
+node scripts/export-wel-tweekwart.mjs "$env:TEMP/oss-wel-vergelijking"
+uv run --no-project --python 3.12 --with ifcopenshell==0.9.0.post1 python scripts/measure-wel-tweekwart.py --verify-exports "$env:TEMP/oss-wel-vergelijking" "C:\BIM\Steektrap_Dicht (3300x900)-L.IFC" "C:\BIM\Boven_- onderkwart_Dicht (3160x1000)-L.IFC"
+```
 
 ## Onafhankelijke gebouwmodellen
 

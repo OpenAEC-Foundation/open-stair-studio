@@ -1,6 +1,27 @@
 export const housedRisers = stair => stair.riserBoards==='closed' &&
   stair.riserJoint==='housed' && stair.riserPosition!=='manual';
 
+// Older housed stairs grew a lip in front of the station to receive the
+// wellat. Retain that datum until the designer sets a projection explicitly.
+export const legacyFrontLip = stair => stair.wel == null && housedRisers(stair) &&
+  stair.wellatType==='chamfered' ? Number(stair.wellatWidth) : 0;
+
+const manualTopInset = stair => stair.riserBoards==='closed' && stair.riserPosition==='manual' &&
+  !stair.type?.endsWith('_winder') ? Number(stair.riserTopInset) : 0;
+
+export const effectiveWel = stair => stair.wel ?? (legacyFrontLip(stair) + manualTopInset(stair));
+
+// Uphill from the nominal station to the upper face of the riser. Manual
+// boards pivot their sloping profile about that face.
+export const riserPlaneOffset = stair => stair.wel ?? 0;
+
+// A sloping front face moves toward the wel as it descends. Bevel the back
+// of the strip by this distance at its bottom to leave a flush joint.
+export function wellatBackCut(stair,boardHeight) {
+  if(stair.wel==null || stair.riserPosition!=='manual' || stair.type?.endsWith('_winder') || !(boardHeight>0)) return 0;
+  return stair.wellatHeight*(Number(stair.riserTopInset)+Number(stair.riserBottomInset))/boardHeight;
+}
+
 const signedArea = points=>points.reduce((sum,a,i)=>{
   const b=points[(i+1)%points.length];
   return sum+a.x*b.y-a.y*b.x;
@@ -27,10 +48,12 @@ export function riserStock(points,d,height,thickness,bottomZ) {
       xAxis:{...d,z:0},yAxis:{...n,z:0},zAxis:{x:0,y:0,z:1}}};
 }
 
-export function nosingStrip(tread,stair,clipStrip,back) {
+export function nosingStrip(tread,stair,clipStrip,back,boardHeight) {
   const width=stair.wellatWidth,height=stair.wellatHeight,bevel=Math.min(3,width/2,height/2);
   const {direction:d,frontEdge,elevation,thickness,points}=tread;
   const top=elevation-thickness,front=back-width,fold=front+bevel;
+  const cutback=wellatBackCut(stair,boardHeight),heel=back-cutback;
+  if(heel<fold-1e-7) return null;
   const at=p=>(p.x-frontEdge[0].x)*d.x+(p.y-frontEdge[0].y)*d.y;
   const cut=(a,b)=>clipStrip(points,frontEdge[0],d,a,b);
   const outline=cut(front,back),faceContour=boardOutline(outline,d);
@@ -38,19 +61,30 @@ export function nosingStrip(tread,stair,clipStrip,back) {
   const length=Math.max(...faceContour.map(p=>p.x));
   const faces=[];
   let volume=0;
-  // Two planar sections share the bevel seam. Clip both on the real side of
-  // the tread so a winding step receives its own compound end cuts.
-  for(const [from,to] of [[front,fold],[fold,back]]) {
+  // Clip each planar section to the actual sides of the tread, including
+  // the compound end cuts of a winder.
+  const seams=cutback>0 ? [fold,heel] : [fold];
+  const limits=[front,...seams,back];
+  for(let k=1;k<limits.length;k++) {
+    const from=limits[k-1],to=limits[k];
+    if(to-from<=1e-7) continue;
     const poly=cut(from,to);
     if(poly.length<3) continue;
     if(signedArea(poly)<0) poly.reverse();
     const upper=poly.map(p=>({...p,z:top}));
-    const lower=poly.map(p=>({...p,z:top-height+Math.max(0,fold-at(p))}));
+    const lower=poly.map(p=>{
+      const u=at(p);
+      const rearBevel=cutback>0 ? Math.max(0,(u-heel)*height/cutback) : 0;
+      return {...p,z:Math.min(top,top-height+Math.max(0,fold-u,rearBevel))};
+    });
     faces.push(upper,[...lower].reverse());
     for(let i=0;i<poly.length;i++) {
       const j=(i+1)%poly.length;
-      if(Math.abs(at(poly[i])-fold)>1e-6||Math.abs(at(poly[j])-fold)>1e-6)
-        faces.push([lower[i],lower[j],upper[j],upper[i]]);
+      if(seams.some(s=>Math.abs(at(poly[i])-s)<1e-6 && Math.abs(at(poly[j])-s)<1e-6)) continue;
+      const face=[lower[i],lower[j]];
+      if(top-lower[j].z>1e-6) face.push(upper[j]);
+      if(top-lower[i].z>1e-6) face.push(upper[i]);
+      if(face.length>=3) faces.push(face);
     }
     // Height varies linearly on the bevel. Triangle centroids integrate it exactly.
     for(let i=1;i+1<poly.length;i++){
@@ -61,7 +95,7 @@ export function nosingStrip(tread,stair,clipStrip,back) {
   const centre=cut(front+width/2,back).filter(p=>Math.abs(at(p)-front-width/2)<1e-5);
   centre.sort((a,b)=>d.y*(a.x-b.x)-d.x*(a.y-b.y));
   const axisPath=centre.length>=2?[centre[0],centre.at(-1)].map(p=>({...p,z:top-height/2})):[];
-  const section=[[0,height],[width,height],[width,0],[bevel,0],[0,bevel]];
+  const section=[[0,height],[width,height],[width-cutback,0],[bevel,0],[0,bevel]];
   return {id:tread.id+'-WL',label:'Wellat onder trede',kind:'member',role:'nosingStrip',material:'timber',
     profileName:'Wellat met vellingkant '+bevel+' mm',profileContour:section.map(([x,y])=>({x,y})),faceContour,
     axisPath,faces,partOf:tread.id,lengthMm:axisPath.length?Math.hypot(axisPath[1].x-axisPath[0].x,axisPath[1].y-axisPath[0].y):length,

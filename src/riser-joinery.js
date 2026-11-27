@@ -1,4 +1,5 @@
 import { buildWinderRiserJoinery } from './winder-riser-joinery.js';
+import { insideFinishedContour } from './housing-cam.js';
 
 const EPS = 1e-6;
 const dot = (a,b) => a.x*b.x + a.y*b.y + a.z*b.z;
@@ -40,18 +41,6 @@ function boardMesh(boxes,world) {
     });
   }
   return faces;
-}
-
-function insideBoard(loop,polygon) {
-  const area=polygon.reduce((sum,a,i)=>{
-    const b=polygon[(i+1)%polygon.length];
-    return sum+a.x*b.y-b.x*a.y;
-  },0);
-  const sign=Math.sign(area);
-  return sign!==0 && polygon.every((a,i)=>{
-    const b=polygon[(i+1)%polygon.length], dx=b.x-a.x, dy=b.y-a.y;
-    return loop.every(p=>sign*(dx*(p.y-a.y)-dy*(p.x-a.x))>EPS*Math.hypot(dx,dy));
-  });
 }
 
 // Upper tread: the underside groove and its vertical tongue start behind the
@@ -200,7 +189,7 @@ export function buildRiserJoinery(geometry,stair,housings,detailParts) {
       const groove=loop(x0,lo,x1,hi);
       const tongue=loop(tx0,lo+endRelief,tx1,hi-endRelief);
       const minRoof=kind==='tread'?Math.min(...groove.map(p=>roofAt(host,stair,p))):host.thickness;
-      if(hi-lo<=2*endRelief || depth>=minRoof-EPS || !insideBoard(groove,host.points)){
+      if(hi-lo<=2*endRelief || depth>=minRoof-EPS || !insideFinishedContour(groove,host.points)){
         noteError('riser-groove-stock','De stootbordgroef valt buiten het hout of door het oppervlak van '+host.id+'.',host.id);
         return;
       }
