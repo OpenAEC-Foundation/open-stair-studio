@@ -2,6 +2,10 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.16
+
+- Het plaatwangblad drukt nu als één A3-landscapeblad af. De contour, bruto- en nettomassa, alle opleghoekreferenties en de productienoot blijven bij elkaar.
+
 ## Nieuw in 0.13.15
 
 - De open driehoekige stalen plaatwang heeft nu een eigen werkblad met buitencontour, echte uitsparing, bruto plaatmaat, netto massa en referentielijnen voor de gemodelleerde tredeopleggingen. Een DXF exporteert de twee snijcontouren op aparte lagen; boor- en lasdetails blijven expliciet projectwerk.
