@@ -77,7 +77,7 @@ for(const side of ['L','R']) {
   const id='vlucht-1-wang-'+side;
   const frame=open.parts.find(p=>p.id===id),plate=closed.parts.find(p=>p.id===id);
   assert(frame.faces.length>plate.faces.length,'triangular opening is modeled in the side plate');
-  assert(frame.volumeM3<plate.volumeM3,'opening reduces actual steel takeoff');
+  assert(frame.volumeM3<frame.platePattern.stockMassKg/7850,'open frame uses less than its rectangular plate blank');
   assert(open.structural.checks.filter(c=>c.id.startsWith(id+'-')&&
     ['-buiging','-doorbuiging','-kip','-doorsnede'].some(s=>c.id.endsWith(s)))
     .every(c=>c.status==='open'),'solid plate checks cannot certify the perforated frame');

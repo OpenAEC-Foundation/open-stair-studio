@@ -4,6 +4,7 @@
   import AssemblyEngineering from './AssemblyEngineering.svelte';
   import WellDrawing from './WellDrawing.svelte';
   import PrecastWorkshop from './PrecastWorkshop.svelte';
+  import SteelPlateSheet from './SteelPlateSheet.svelte';
   import Icon from './Icon.svelte';
   import {escapeReference} from './escape-capacity.js';
   import { componentTypes, elevationOf, floorParts, kindNames, levelsFor, materialNames, typeOf } from './stairwell.js';
@@ -26,6 +27,7 @@
   let insertsOnly=false;
   $: detailed=current?.instance.params.detailing==='engineered';
   $: if(instance?.type!=='concrete' && mode==='Prefabdetails') mode='3D';
+  $: if(mode==='Plaatwang'&&!current?.parts.some(part=>part.platePattern)) mode='3D';
   $: if (!current) {scope='selected';context=false;}
   $: floor=instance?.storey ?? 0;
   $: onFloor=assemblies.filter(a=>a.instance.storey===floor);
@@ -41,8 +43,11 @@
     if(signature!==lastScene){lastScene=signature; camera=null; tick().then(()=>viewport?.home());}
   }
   function csv(){
-    const rows=[['Component','Bouwlaag','Onderdeel','Omschrijving','Categorie','Materiaal','Nettovolume (m³)','Massa (kg)'],
-      ...visible.flatMap(a=>a.parts.map(p=>[a.instance.mark,a.instance.storey,p.id,p.label,kindNames[p.kind]??p.kind,materialNames[p.material]??p.material,quantity(p.volumeM3,6),quantity(p.massKg,3)]))];
+    const rows=[['Component','Bouwlaag','Onderdeel','Omschrijving','Categorie','Materiaal','Nettovolume (m³)','Massa (kg)',
+      'Ruwe plaatlengte (mm)','Ruwe plaathoogte (mm)','Plaatdikte (mm)','Bruto plaatmassa (kg)'],
+      ...visible.flatMap(a=>a.parts.map(p=>[a.instance.mark,a.instance.storey,p.id,p.label,kindNames[p.kind]??p.kind,materialNames[p.material]??p.material,
+        quantity(p.volumeM3,6),quantity(p.massKg,3),quantity(p.platePattern?.stockLength,2),quantity(p.platePattern?.stockHeight,2),
+        quantity(p.platePattern?.thickness,2),quantity(p.platePattern?.stockMassKg,3)]))];
     const cell=v=>'"'+String(v).replaceAll('"','""')+'"';
     downloadFile(project.number+'-trappenhuis-onderdelen.csv','\ufeff'+rows.map(row=>row.map(cell).join(';')).join('\r\n'),'text/csv;charset=utf-8');
   }
@@ -62,12 +67,12 @@
     </div>
   {:else}
     <div class="well-tools">
-      <div class="mode">{#each ['3D','Plattegrond','Aanzicht','Onderdelen','Ontwerpcontrole',...(current.structural?['Berekening','Verbindingen']:[]),...(instance.type==='concrete'?['Prefabdetails']:[])] as v}<button class:active={mode===v} aria-pressed={mode===v} onclick={()=>mode=v}>{v}</button>{/each}</div>
-      {#if mode!=='Prefabdetails'&&!structuralMode}<select aria-label="Zichtbare componenten" value={scope} onchange={e=>{scope=e.currentTarget.value;context=scope!=='selected';}}><option value="selected">Actief ontwerp</option><option value="floor">Vertrekbouwlaag</option><option value="building">Hele trappenhuis</option></select>
+      <div class="mode">{#each ['3D','Plattegrond','Aanzicht','Onderdelen','Ontwerpcontrole',...(current.parts.some(part=>part.platePattern)?['Plaatwang']:[]),...(current.structural?['Berekening','Verbindingen']:[]),...(instance.type==='concrete'?['Prefabdetails']:[])] as v}<button class:active={mode===v} aria-pressed={mode===v} onclick={()=>mode=v}>{v}</button>{/each}</div>
+      {#if mode!=='Prefabdetails'&&mode!=='Plaatwang'&&!structuralMode}<select aria-label="Zichtbare componenten" value={scope} onchange={e=>{scope=e.currentTarget.value;context=scope!=='selected';}}><option value="selected">Actief ontwerp</option><option value="floor">Vertrekbouwlaag</option><option value="building">Hele trappenhuis</option></select>
       <label><input type="checkbox" bind:checked={context}/> Vloerranden</label>{/if}
       {#if mode==='3D' && detailed}<label><input type="checkbox" bind:checked={insertsOnly}/> Alleen wapening en instortdelen</label>{/if}
     </div>
-    <div class="stage" class:sheet={mode!=='3D'} class:precast={mode==='Prefabdetails'||structuralMode}>
+    <div class="stage" class:sheet={mode!=='3D'} class:precast={mode==='Prefabdetails'||mode==='Plaatwang'||structuralMode}>
       {#if mode==='3D'}
         {#if scene.componentParts.length}
           <StairViewport geometry={scene} bind:this={viewport} bind:cameraState={camera} bind:zoomPercent={zoom}/>
@@ -76,6 +81,8 @@
       {:else if mode==='Prefabdetails'}
         <PrecastWorkshop bind:this={workshop} assembly={current} {project} {downloadFile} {printSheet} {printing}
           changePlan={(id,changes)=>change('liftPlan',id,changes)} changeParam={(key,value)=>change('params',key,value)} enable={()=>change('params','detailing','engineered')}/>
+      {:else if mode==='Plaatwang'}
+        <SteelPlateSheet assembly={current} {project} {downloadFile} {printSheet}/>
       {:else if structuralMode && current.structural}
         <AssemblyEngineering bind:this={engineering} assembly={current} {project} {well} {printSheet} {printing} details={mode==='Verbindingen'} openDetails={openConnection} changeGround={(id,plan)=>change('connectionGround',id,plan)}/>
       {:else if mode==='Ontwerpcontrole'}
@@ -102,7 +109,7 @@
       <details><summary>Maten en hoeveelheden</summary><dl>{#each current.metrics as m}<div><dt>{m.label}</dt><dd>{number(m.value)} {m.unit??''}</dd></div>{/each}</dl></details>
       <div class="actions"><button class="action-btn" onclick={()=>exportIfc()}>Ontwerp als IFC4</button>{#if well.instances.length>1}<button class="action-btn" onclick={()=>exportIfc('project')}>Geheel project als IFC4</button>{/if}<button class="action-btn" onclick={printSheet}>Tekening afdrukken</button><button class="action-btn" onclick={csv}>Onderdelen als CSV</button></div>
     </div>
-    {#if printing && mode!=='Prefabdetails' && !structuralMode}<article class="well-print">
+    {#if printing && mode!=='Prefabdetails' && mode!=='Plaatwang' && !structuralMode}<article class="well-print">
       {#if scope==='building'}<div class="building-sheet"><h1>{project.number} · Trappenhuis</h1><p>{project.name} · revisie {project.revision} · gebouw-aanzicht · mm</p>
         <WellDrawing assemblies={visible} {well} storey={0} side="elevation" allLevels={true} showContext={context}/>
         <p>{visible.map(a=>a.instance.mark+' · laag '+a.instance.storey).join(' / ')}</p></div>{/if}

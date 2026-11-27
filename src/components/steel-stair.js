@@ -191,9 +191,26 @@ function builder(defs,isEscape) {
     }
     if(!Number.isFinite(p.height)||p.height<=0||p.height>10000) issues.push({level:'error',text:'Controleer de verdiepingshoogte.'});
     const rise=p.height/p.risers,grated=p.treadType==='grating',deck=grated?p.gratingDepth:35;
+    function openFrameShape(count) {
+      const run=(count-1)*p.going,web=Math.max(40,p.stringerThickness*5),foot=10;
+      const gradient=rise/p.going,top=x=>rise+x*gradient;
+      // Keep the whole horizontal 40 mm deep tread-cleat attachment strip in
+      // solid plate. Its far end, not the centre of the tread, sets the cut.
+      const clearance=top(p.going-25)-(rise-deck-40)+10;
+      const base=foot+web,right=run-web;
+      const apex=Math.max(2*web,(base+clearance-rise)/gradient);
+      return {run,web,foot,apex,right,base,top,
+        outer:[[0,foot],[run,foot],[run,count*rise],[0,rise]],
+        hole:[[apex,base],[right,top(right)-clearance],[right,base]]};
+    }
     if(rise<=deck+50) issues.push({level:'error',text:'Optrede te klein voor de tredeconstructie, opleghoek en voetplaat.'});
     if(p.stringerStyle==='openFrame'&&p.layout!=='straight')
       issues.push({level:'error',text:'Het open driehoekframe is voorlopig alleen voor een rechte vlucht beschikbaar.'});
+    if(p.stringerStyle==='openFrame') {
+      const frame=openFrameShape(p.risers);
+      if(!(frame.run>4*frame.web&&frame.right-frame.apex>frame.web&&frame.hole[1][1]>frame.base+frame.web))
+        issues.push({level:'error',text:'Het open driehoekgat past niet naast de volledige tredeopleghoeken en de voetregel.'});
+    }
     if(issues.length) return result;
     const material=p.finish;
     function add(id,label,kind,role,faces,move=v=>v,attributes={}) {
@@ -258,16 +275,24 @@ function builder(defs,isEscape) {
       const outline=[[0,foot],[footLength,foot],[footLength,bottom(footLength)]];
       if(cut>footLength+.0001&&cut<run-.0001) outline.push([cut,foot]);
       outline.push([run,bottom(run)],[run,end],[0,rise]);
-      const web=Math.max(40,p.stringerThickness*5);
-      const frameOuter=[[0,foot],[run,foot],[run,end],[0,rise]];
-      const frameHole=[[web*2,foot+web],[run-web,top(run-web)-web],[run-web,foot+web]];
+      const frame=openFrameShape(count);
+      const frameOuter=frame.outer,frameHole=frame.hole;
+      const cleatReferences=Array.from({length:count-1},(_,i)=>({
+        tread:i+1,x0:i*p.going+18,x1:i*p.going+treadLength-18,
+        z:(i+1)*rise-(grated?deck:p.plateThickness)
+      }));
       for(const sign of [-1,1]) {
         const code=sign>0?'L':'R',inside=sign*p.width/2,outside=sign*(p.width/2+p.stringerThickness),y=(inside+outside)/2;
-        const profile=p.stringerStyle==='openFrame'&&run>web*4&&top(run-web)-web>foot+web*2
+        const profile=p.stringerStyle==='openFrame'
           ? openSidePlate(frameOuter,frameHole,Math.min(inside,outside),Math.max(inside,outside))
           : sidePlate(outline,Math.min(inside,outside),Math.max(inside,outside));
         mapPart('wang-'+code,p.stringerStyle==='openFrame'?'Open driehoekwang '+code:'Plaatwang '+code,
-          'member','stringer',profile);
+          'member','stringer',profile,p.stringerStyle==='openFrame'?{
+            platePattern:{outer:frameOuter.map(point=>[...point]),hole:frameHole.map(point=>[...point]),
+              cleatReferences:cleatReferences.map(ref=>({...ref})),thickness:p.stringerThickness,
+              stockLength:run,stockHeight:end-foot,datumZ:foot,
+              stockMassKg:run*(end-foot)*p.stringerThickness*7850/1e9}
+          }:{});
         if(name==='vlucht-1') anchoredFoot(mapPart,'voet-'+code,'Wangvoetplaat '+code,footLength/2,y,0,footLength,90,foot,p.steelEmbed);
         else mapPart('voet-'+code,'Wangvoetplaat '+code,'plate','basePlate',box(0,y-45,0,footLength,y+45,foot));
         const faceInner=inside-sign*65;

@@ -2,6 +2,12 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.15
+
+- De open driehoekige stalen plaatwang heeft nu een eigen werkblad met buitencontour, echte uitsparing, bruto plaatmaat, netto massa en referentielijnen voor de gemodelleerde tredeopleggingen. Een DXF exporteert de twee snijcontouren op aparte lagen; boor- en lasdetails blijven expliciet projectwerk.
+- De uitsparing houdt nu over de volledige lengte van elke tredeopleghoek een materiaalstrook vrij. Een geometrische controle voorkomt dat het gat onder de opleghoek doorloopt.
+- Een aanvullend referentieonderzoek benoemt de volgende ontwikkelstappen voor gesloten stootbordhuizen, individuele starttredevormen, boomprofielen en verbindingen.
+
 ## Nieuw in 0.13.14
 
 - De onderzijde van ingekroosde trapbomen heeft nu een vlakke oplegvoet aan vloer of bordes en loopt daarna evenwijdig aan de traphelling. Treden steken bij de bordesaansluiting niet meer onder de boom uit.
