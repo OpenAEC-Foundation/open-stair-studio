@@ -62,8 +62,9 @@
     <input id="middle-offset" class="text-field" type="number" step="any" value={stair.middleOffset}
       onchange={e=>update('middleOffset',e.currentTarget)} />
     <small>Hoeken in graden, van beneden naar boven. De laatste trede vult ieder kwart aan tot 90°.</small>
-    <QuarterAngles {stair} {update} field="firstQuarterAngles" title="Onderkwart" />
-    <QuarterAngles {stair} {update} field="secondQuarterAngles" title="Bovenkwart" />
+    <small>Verschuif een grens loodrecht op de stootbordlijn. Positief is in stijgrichting. Beide aangrenzende bladen volgen de lijn. De grenzen aan het rechte tussenstuk liggen vast.</small>
+    <QuarterAngles {stair} {update} field="firstQuarterAngles" title="Onderkwart" firstLevel={geometry.dimensions.entrySteps+1} />
+    <QuarterAngles {stair} {update} field="secondQuarterAngles" title="Bovenkwart" firstLevel={geometry.dimensions.entrySteps+stair.firstQuarterAngles.length+stair.middleSteps+1} />
   {/if}
   <label for="outer-shape">Vorm buitenwang</label>
   <select id="outer-shape" value={stair.outerShape} onchange={e => update('outerShape', e.currentTarget.value)}>

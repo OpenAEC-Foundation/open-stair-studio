@@ -4,7 +4,7 @@ import { buildWinderSchedule } from './winder-parts.js';
 import { housedRisers, legacyFrontLip, riserPlaneOffset } from './timber-riser.js';
 import { signedMeshVolume } from './components/solids.js';
 import { dimensionedRoute, usesOuterDimensions } from './dimensioned-winder.js';
-import { quarterAngleError } from './two-quarter-settings.js';
+import { quarterAngleError, quarterOffsetError } from './two-quarter-settings.js';
 import { finishNewels, trimAtNewels } from './quarter-newels.js';
 
 const quarter = Math.PI / 2;
@@ -178,6 +178,22 @@ function cutRail(rail, stations, cut) {
   return best;
 }
 
+// Two neighbouring cuts may intersect inside the post, where the board is
+// trimmed away. An intersection across the exposed width reverses the
+// tread boundaries and cannot describe a sawn step.
+function exposedCutsCross(a,b,posts) {
+  const denominator=cross(a.forward,b.forward);
+  if (Math.abs(denominator)<epsilon) return false;
+  const tangent={x:-a.forward.y,y:a.forward.x};
+  const point=add(a.at,tangent,dot(sub(b.at,a.at),b.forward)/denominator);
+  if (posts.some(p=>point.x>=p.xMin-epsilon && point.x<=p.xMax+epsilon &&
+                    point.y>=p.yMin-epsilon && point.y<=p.yMax+epsilon)) return false;
+  return [a,b].every(cut=>{
+    const inner=cut.hits[0].point, outer=cut.hits[1].point;
+    return dot(sub(point,inner),sub(point,outer))<-epsilon;
+  });
+}
+
 function interval(rail, first, last) {
   const points = [first.point];
   for (let i = Math.ceil(first.index + epsilon); i < last.index - epsilon; i++) points.push(rail[i]);
@@ -236,6 +252,13 @@ function makeCuts(stair, d) {
         (!atPost && face.index<=boardBacks[i-1].hits[side].index+epsilon))) return null;
     if (!d.dimensioned && stair.wel==null && i && nose.index<=seatEnds[i-1].hits[side].index+epsilon) return null;
   }
+  if (route.distributions?.length) {
+    for (let i=1; i<noses.length; i++) {
+      if (exposedCutsCross(noses[i-1],noses[i],route.posts) ||
+          exposedCutsCross(faces[i-1],faces[i],route.posts))
+        return {issue:'De grensverschuiving of draaihoek laat de snijlijnen bij trede '+i+' kruisen. Verklein de correctie of verander de draaihoek.'};
+    }
+  }
   const cuts = { route, sides, fronts, noses, faces, boardBacks, seatEnds, boards };
   cuts.rails = sides.map((rail,sideIndex) => railStock(rail,sideIndex,cuts,stair.stringerThickness));
   if (cuts.rails.some(rail => !rail)) return { issue:'De eindzaagsnede kruist het verstek van een wangsegment. Verplaats de tredepositie of voeg een rechte aan- of uitloop toe.' };
@@ -257,7 +280,9 @@ function basicIssues(stair, d) {
   if (d.dimensioned) {
     if (![stair.outerLength,stair.outerDepth].every(x=>Number.isFinite(x)&&x>0))
       return ['Vul twee positieve buitenmaten in.'];
-    const error = quarterAngleError(stair.firstQuarterAngles) || quarterAngleError(stair.secondQuarterAngles);
+    const error = quarterAngleError(stair.firstQuarterAngles) || quarterAngleError(stair.secondQuarterAngles)
+      || quarterOffsetError(stair.firstQuarterOffsets??[], d.perQuarter)
+      || quarterOffsetError(stair.secondQuarterOffsets??[], d.upperCount);
     if (error) return [error];
   }
   if (!Number.isInteger(d.perQuarter) || d.perQuarter < 2 || d.perQuarter > 8) return ['Kies twee tot acht boogtreden per kwartslag.'];
@@ -280,6 +305,8 @@ export function winderIssues(stair) {
   const cuts = d.dimensioned ? fittedCuts.get(d) : makeCuts(stair,d);
   if (cuts?.issue) return [cuts.issue];
   if (cuts) return [];
+  if (d.dimensioned && (stair.firstQuarterOffsets?.length || stair.secondQuarterOffsets?.length))
+    return ['De ingestelde tredegrenzen passen niet in stijgvolgorde tussen de wangen. Controleer de grensverschuivingen, draaihoeken en tredepositie.'];
   return [housedRisers(stair)
     ? 'De trede, wellat of stootbordoplegging past niet tussen de opeenvolgende snijlijnen aan de wang. Controleer binnenstraal, neuspositie, wellatbreedte en stootborddikte.'
     : 'De tredegrenzen snijden de wang in deze bocht niet in oplopende volgorde. Vergroot de bochtstraal of verklein het neusoverstek.'];
@@ -527,6 +554,7 @@ export function generateWinderGeometry(stair, family, options) {
         level: i + 1, elevation: (i + 1) * rise, thickness: stair.treadThickness, length: Math.max(...widths) - Math.min(...widths),
         width: Math.max(...heights) - Math.min(...heights), center, direction: reflect(front.forward),
         points, svgPoints: svgPoints(points), area, volume: area * stair.treadThickness / 1e9,
+        ...(cuts.route.distributions?.[i] && {windingDistribution:cuts.route.distributions[i]}),
         frontEdge, isWinder, eligibleAt170Mm, goingAtWalkline: normalDepth(goingContour,front),
         depthAtWalkline: normalDepth(polygon(...visible),nose), narrowDepth: Math.min(...visible.map(edgeLength)),
         ...(cuts.boards ? {riserSeat:seat(i), ...(i===treadCount-1 ? {exitRiserSeat:seat(i+1)} : {})} : {}) });

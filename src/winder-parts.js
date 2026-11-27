@@ -40,6 +40,7 @@ export function treadPart(tread) {
     quantity: 1, length, width, thickness: tread.thickness,
     area: tread.area, volume: tread.volume ?? tread.area * tread.thickness / 1e9,
     ...(tread.noseDetail?{noseDetail:tread.noseDetail}:{}),
+    ...(tread.windingDistribution ? {windingDistribution:tread.windingDistribution} : {}),
     blankVolume: length * width * tread.thickness / 1e9,
     level: tread.level, elevation: tread.elevation, isWinder: tread.isWinder,
     goingAtWalkline: tread.goingAtWalkline, depthAtWalkline: tread.depthAtWalkline,
@@ -94,6 +95,7 @@ export function makePartsCsvRows(geometry, material, cncStock) {
   const mm = v => v == null ? '' : Number(v.toFixed(3));
   const hasProfiles=geometry.parts.some(p=>p.noseDetail);
   const hasNewels=geometry.parts.some(p=>p.kind==='quarterNewel');
+  const hasDistribution=geometry.parts.some(p=>p.windingDistribution);
   const header = ['Merk', 'Onderdeel', 'Aantal', 'Ruwlengte mm', 'Ruwbreedte mm', 'Dikte mm',
     'Netto m3', 'Bruto m3', 'Materiaal', 'Tredenummer', 'Bovenkant mm',
     'Aantrede klimlijn mm', 'Tredevlak klimlijn mm', 'Kortste zijmaat langs wang mm', 'Contouroppervlak mm2'];
@@ -101,6 +103,7 @@ export function makePartsCsvRows(geometry, material, cncStock) {
   if (geometry.riserJoinery) header.push('Stootbordgroeven', 'Groefdiepte stootbord mm');
   if (hasProfiles) header.push('Neusprofiel','Profielmaat mm','Lengte voorrand mm','Volumevermindering neus cm3');
   if (hasNewels) header.push('Spilaansluiting', 'Insteek in spil mm', 'Tredehuizen in spil');
+  if (hasDistribution) header.push('Kwart', 'Trede in kwart', 'Correctie voorste stootbordlijn mm', 'Correctie achterste stootbordlijn mm');
   return [[...header, ...extraHeader], ...geometry.parts.map(p => [
     p.id, p.name, p.quantity, mm(p.length), mm(p.width), mm(p.thickness),
     p.volume.toFixed(8), p.blankVolume.toFixed(8), material, p.level ?? '', mm(p.elevation),
@@ -111,6 +114,8 @@ export function makePartsCsvRows(geometry, material, cncStock) {
       mm(p.noseDetail.frontLengthMm),mm(p.noseDetail.removedMm3/1000)]:['','','','']) : []),
     ...(hasNewels ? [(p.newelJoints ?? []).map(j=>j.postId).join(' / '),
       (p.newelJoints ?? []).map(j=>mm(j.depth)).join(' / '),p.kind==='quarterNewel'?p.pocketCount:''] : []),
+    ...(hasDistribution ? (p.windingDistribution ? [p.windingDistribution.quarter==='lower'?'Onderkwart':'Bovenkwart',
+      p.windingDistribution.index,mm(p.windingDistribution.frontOffsetMm),mm(p.windingDistribution.backOffsetMm)] : ['','','','']) : []),
     ...stockFields(p.kind === 'tread' ? p : null)
   ])];
 }

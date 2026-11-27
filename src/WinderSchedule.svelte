@@ -79,6 +79,12 @@
         <div class="key"><span><i class="blank"></i> Ruwe plank</span><span><i class="nose"></i> Voorrand</span>{#if selected.tongues?.length}<span><i class="lip"></i> Insteeklip</span>{/if}</div>
       </div>
       <dl>
+        {#if selected.windingDistribution}
+          {@const winding = selected.windingDistribution}
+          <dt>Verdeling {winding.quarter==='lower'?'onderkwart':'bovenkwart'}</dt><dd>Trede {winding.index}</dd>
+          <dt>Correctie stootbordlijnen · voor / achter</dt>
+          <dd>{winding.frontOffsetMm.toLocaleString('nl-NL',{maximumFractionDigits:3})} / {winding.backOffsetMm.toLocaleString('nl-NL',{maximumFractionDigits:3})} mm</dd>
+        {/if}
         {#if selected.tongueCount != null}
           <dt>Insteeklippen in de contour</dt><dd>{selected.tongueCount} × {length(geometry.housings.settings.depth)} mm diep</dd>
         {/if}

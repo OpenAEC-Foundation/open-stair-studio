@@ -124,8 +124,10 @@ export function dimensionedRoute(stair, d) {
     const overshoot = Math.max(0,endCut-innerX);
     return innerX + overshoot + Math.min(2*overshoot, stock/2);
   }
-  const lowX = lowPost ? Math.max(innerX,lowPost.xMax,entryX+board) : cornerFace(entryX+board);
-  const highX = highPost ? Math.max(innerX,highPost.xMax,exitX+wel) : cornerFace(exitX+wel);
+  const lowerLimit=entryX+board+Math.max(0,stair.firstQuarterOffsets?.[0]??0);
+  const upperLimit=exitX+wel-Math.min(0,stair.secondQuarterOffsets?.at(-1)??0);
+  const lowX = lowPost ? Math.max(innerX,lowPost.xMax,lowerLimit) : cornerFace(entryX+board);
+  const highX = highPost ? Math.max(innerX,highPost.xMax,upperLimit) : cornerFace(exitX+wel);
   if (lowPost) lowPost.railX=lowX;
   if (highPost) highPost.railX=highX;
   const taper = Math.min(going,middleRun/2);
@@ -174,10 +176,28 @@ export function dimensionedRoute(stair, d) {
   for (const {chain,angle,x,y} of upper)
     append(x??(highX-Math.max(0,chain)),y??(farY+Math.min(0,chain)),highPost?angle/degrees:90+angle/degrees);
   for (let i=1; i<=d.exitSteps; i++) append(exitX-i*going,farY,180);
+  // A dividing plane is shared by the tread below, the riser, and the tread
+  // above. Keep the two straight middle-run planes fixed. At the lower
+  // quarter specify the *fronts* in walking order; at the upper, the *backs*.
+  const distributions=[];
+  for (const [quarter, offsets, start] of [
+    ['lower',stair.firstQuarterOffsets,d.entrySteps],
+    ['upper',stair.secondQuarterOffsets,upperStart]
+  ]) {
+    if (!offsets?.length) continue;
+    for (const [j,offset] of offsets.entries()) {
+      const front=start+j;
+      faces[quarter==='lower' ? front : front+1].offset=offset;
+      distributions[front]={quarter,index:j+1,
+        frontOffsetMm:quarter==='lower' ? offset : offsets[j-1]??0,
+        backOffsetMm:quarter==='upper' ? offset : offsets[j+1]??0};
+    }
+  }
   const section = s => {
     const index = Math.max(0,Math.min(faces.length-1,Math.round((s+shift)/going)));
     const face = faces[index], forward = {x:Math.cos(face.angle), y:Math.sin(face.angle)};
-    return {s, angle:face.angle, forward, at:{x:face.at.x-wel*forward.x, y:face.at.y-wel*forward.y}};
+    const distance=(face.offset??0)-wel;
+    return {s, angle:face.angle, forward, at:{x:face.at.x+distance*forward.x, y:face.at.y+distance*forward.y}};
   };
-  return {route:{dimensioned:true,minX,posts,entrySteps:d.entrySteps,exitSteps:d.exitSteps}, sides:[inner,outer], stations:[innerStations,outerStations], section};
+  return {route:{dimensioned:true,minX,posts,distributions,entrySteps:d.entrySteps,exitSteps:d.exitSteps}, sides:[inner,outer], stations:[innerStations,outerStations], section};
 }

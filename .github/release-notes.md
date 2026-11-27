@@ -2,6 +2,11 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.25
+
+- Stel in het onder- en bovenkwart per TD-nummer de draaihoek en de verschuiving van de stootbordlijn in. Eén grenswijziging werkt door in beide aangrenzende zaagcontouren. Het rechte tussenstuk houdt zijn aansluitlijnen.
+- Het bijgewerkte De Vries-voorbeeld bevat de ingemeten verdeling van alle vijftien bladen. In **Tredeblad** zijn de zaagcontour, DXF en LinuxCNC per onderdeel beschikbaar. IFC4 en IFCX alpha bevatten per verdreven trede de beide grensverschuivingen. [Meetrapport](https://github.com/OpenAEC-Foundation/open-stair-studio/blob/v0.13.25/docs/verdrijving-tweekwart.md) · [Voorbeelden linksom en rechtsom](https://github.com/OpenAEC-Foundation/open-stair-studio/raw/refs/tags/v0.13.25/examples/tweekwart-verdrijving.zip)
+
 ## Nieuw in 0.13.24
 
 - Bij een houten tweekwartstrap met vaste buitenmaten kun je de onder- en bovenspil afzonderlijk plaatsen. Stel de doorsnede, positie, hoogte, smalle aantrede en insteekdiepte per spil in. Het De Vries-voorbeeld gebruikt een stuikende aansluiting.

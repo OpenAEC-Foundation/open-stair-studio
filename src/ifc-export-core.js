@@ -190,10 +190,12 @@ function writeModel(api, sid, model, geometry) {
         ['DesignOuterDepth_mm', IFC.IFCLENGTHMEASURE, stair.outerDepth],
         ['MiddleStraightOffset_mm', IFC.IFCLENGTHMEASURE, stair.middleOffset],
         ['DevelopedWalkingLineLength_mm', IFC.IFCLENGTHMEASURE, d.totalRun],
-        ...[['Lower',stair.firstQuarterAngles],['Upper',stair.secondQuarterAngles]].flatMap(([quarterName,angles]) => [
+        ...[['Lower',stair.firstQuarterAngles,stair.firstQuarterOffsets],['Upper',stair.secondQuarterAngles,stair.secondQuarterOffsets]].flatMap(([quarterName,angles,offsets]) => [
           [quarterName+'QuarterWinders', IFC.IFCINTEGER, angles.length],
           ...angles.map((degrees, i) => [quarterName+'QuarterAngle'+String(i+1).padStart(2,'0'),
-            IFC.IFCPLANEANGLEMEASURE, degrees*Math.PI/180])
+            IFC.IFCPLANEANGLEMEASURE, degrees*Math.PI/180]),
+          ...(offsets ?? []).map((shift,i) => [quarterName+'QuarterBoundaryOffset'+String(i+1).padStart(2,'0')+'_mm',
+            IFC.IFCLENGTHMEASURE,shift])
         ])
       ] : [['WindersPerQuarter', IFC.IFCINTEGER, d.perQuarter]]),
       ['EntryTreads', IFC.IFCINTEGER, d.entrySteps],
@@ -344,12 +346,23 @@ function writeModel(api, sid, model, geometry) {
       label('BaseQuantities'), [quantity]);
     partRelations.push(relationship(IFC.IFCRELDEFINESBYPROPERTIES, [object], set));
   }
+  function addOccurrenceProperties(object, name, fields) {
+    const pset = e(IFC.IFCPROPERTYSET, guid('pset', name, object.GlobalId.value), null, label(name), null, fields.map(singleProperty));
+    partRelations.push(relationship(IFC.IFCRELDEFINESBYPROPERTIES, [object], pset));
+  }
   function addStairMeasures(object, name, risers, treads) {
     const fields = stairMeasureProperties({risers, treads, rise:mm(d.rise), going:windingFlight ? null : mm(stair.going)});
     if (!engineeredTreads && stair.riserBoards === 'closed')
       fields.push(['NosingLength', IFC.IFCLENGTHMEASURE, mm(effectiveWel(stair)), null]);
-    const pset = e(IFC.IFCPROPERTYSET, guid('pset', name, object.GlobalId.value), null, label(name), null, fields.map(singleProperty));
-    partRelations.push(relationship(IFC.IFCRELDEFINESBYPROPERTIES, [object], pset));
+    addOccurrenceProperties(object,name,fields);
+  }
+  function addWindingDistribution(object,tread) {
+    const dist = tread.windingDistribution;
+    if (dist) addOccurrenceProperties(object,'OSS_Tredeverdrijving',[
+      ['Quarter',IFC.IFCLABEL,dist.quarter], ['IndexInQuarter',IFC.IFCINTEGER,dist.index],
+      ['FrontBoundaryOffset_mm',IFC.IFCLENGTHMEASURE,dist.frontOffsetMm],
+      ['BackBoundaryOffset_mm',IFC.IFCLENGTHMEASURE,dist.backOffsetMm]
+    ]);
   }
   addStairMeasures(stairElement, 'Pset_StairCommon', d.risers, d.treadCount);
   function reservation(id, role, solid, parentPlacement) {
@@ -371,9 +384,11 @@ function writeModel(api, sid, model, geometry) {
     } else {
       shape = representation([treadSolid(tread)]);
     }
-    return e(IFC.IFCPLATE, partGuid(tread.id), null, label(tread.id),
+    const plate = e(IFC.IFCPLATE, partGuid(tread.id), null, label(tread.id),
       text(surfaceTreads ? 'Nominaal bovenvlak van de trede.' : 'Nominale buitencontour en inbouwdikte van de trede.'),
       label(dossier.structureLabel), localPlacement(flightPlacement), shape, identifier(tread.id), enumValue('USERDEFINED'));
+    addWindingDistribution(plate,tread);
+    return plate;
   }
   for (const flight of geometry.flights) {
     const treads = geometry.treads.filter(tread => tread.flightIndex === flight.index);
@@ -387,6 +402,7 @@ function writeModel(api, sid, model, geometry) {
           label('Houten trede'), localPlacement(flightPlacement), finishedBody(tread.id, treadSolid(body)),
           identifier(tread.id), enumValue('USERDEFINED'));
         addNetVolume(object,'Qto_PlateBaseQuantities',netByHost.get(tread.id) ?? body.volume);
+        addWindingDistribution(object,tread);
         parts.push(object);
         timberTreads.push(object);
         joineryHosts.set(tread.id, object);

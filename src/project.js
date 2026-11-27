@@ -3,7 +3,7 @@ import { isWinder } from './winder.js';
 import { readWell } from './stairwell.js';
 import { ifcModelId } from './ifc-identity.js';
 import {timberDimensions, timberStyles, noseNames} from './timber-settings.js';
-import {devriesIfcDepth, devriesNewelSettings, equalQuarterAngles, newelDimensions, quarterAngleError} from './two-quarter-settings.js';
+import {devriesIfcDepth, devriesDistributedSettings, equalQuarterAngles, newelDimensions, quarterAngleError, quarterOffsetError} from './two-quarter-settings.js';
 import { validateCamField } from './housing-cam.js';
 import { validateTreadCamField } from './tread-cam.js';
 import { validateRiserCamField } from './riser-board-settings.js';
@@ -53,9 +53,15 @@ const labels = {
   upperLandingWidth: 'Bovenbordesbreedte', upperLandingDepth: 'Bovenbordesdiepte'
 };
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const quarterOffsetFields = {firstQuarterAngles:'firstQuarterOffsets', secondQuarterAngles:'secondQuarterOffsets'};
 
 function readField(section, key, value) {
   const prototype = starterProject[section][key];
+  if (section === 'stair' && Object.values(quarterOffsetFields).includes(key)) {
+    const issue = quarterOffsetError(value);
+    if (issue) throw new Error(issue);
+    return [...value];
+  }
   if (section === 'stair' && (key === 'firstQuarterAngles' || key === 'secondQuarterAngles')) {
     const issue = quarterAngleError(value);
     if (issue) throw new Error(issue);
@@ -141,6 +147,10 @@ export function readProject(raw) {
       if (Object.hasOwn(raw[section], key)) model[section][key] = readField(section, key, raw[section][key]);
     }
   }
+  for (const [angles, offsets] of Object.entries(quarterOffsetFields)) {
+    const issue = quarterOffsetError(model.stair[offsets], model.stair[angles].length);
+    if (issue) throw new Error(issue);
+  }
   model.bim.modelId = ifcModelId(raw);
   if (!model.stairwell.uid && model.stairwell.instances.length) {
     // Migrate the namespace formerly chosen at export time before a component
@@ -176,6 +186,12 @@ export function startSession(model, saved = true) {
 export function editSession(session, section, key, value) {
   if (Object.is(session.model[section][key], value) && !(section === 'stair' && key === 'type' && !session.model.stairEnabled)) return session;
   const model = { ...session.model, [section]: { ...session.model[section], [key]: value } };
+  if (section === 'stair' && Object.hasOwn(quarterOffsetFields,key) && value.length !== session.model.stair[key].length)
+    model.stair[quarterOffsetFields[key]] = [];
+  if (section === 'stair' && Object.values(quarterOffsetFields).includes(key)) {
+    const issue = quarterOffsetError(value,model.stair[key.replace('Offsets','Angles')].length);
+    if (issue) throw new Error(issue);
+  }
   if (section === 'stair' && key === 'type') model.stairEnabled = true;
   if (section === 'stair' && key === 'twoQuarterLayout' && value === 'dimensioned' &&
       model.stair.outerLength == null && model.stair.outerDepth == null) {
@@ -185,6 +201,8 @@ export function editSession(session, section, key, value) {
     stair.outerDepth = Math.ceil(footprint.width || stair.width + (2+Math.max(0,stair.entrySteps))*stair.going);
     stair.firstQuarterAngles = equalQuarterAngles(stair.windersPerQuarter);
     stair.secondQuarterAngles = [...stair.firstQuarterAngles];
+    stair.firstQuarterOffsets = [];
+    stair.secondQuarterOffsets = [];
   }
   if (section === 'stair' && key === 'type' && isWinder(value)) {
     model.stair.stringerLeft = 'housed';
@@ -194,7 +212,7 @@ export function editSession(session, section, key, value) {
   if(section==='stair'&&key==='riserPosition'&&value==='manual') model.stair.riserJoint='butt';
   // Surveyed widths refer to a particular stair layout. Undo restores both
   // the geometry and the measurements for that layout together.
-  if (section === 'stair' && (/^(lower|upper)Newel/.test(key) || ['width', 'stringerThickness', 'stringerLeft','stringerRight','stringerOverhang','type', 'turnDirection', 'outerShape', 'twoQuarterLayout', 'outerLength', 'outerDepth', 'middleOffset', 'firstQuarterAngles', 'secondQuarterAngles', 'laneGap', 'going', 'risers', 'windersPerQuarter', 'middleSteps', 'entrySteps', 'nosing', 'wel', 'landingLength','landingRiser'].includes(key))) {
+  if (section === 'stair' && (/^(lower|upper)Newel/.test(key) || ['width', 'stringerThickness', 'stringerLeft','stringerRight','stringerOverhang','type', 'turnDirection', 'outerShape', 'twoQuarterLayout', 'outerLength', 'outerDepth', 'middleOffset', 'firstQuarterAngles', 'secondQuarterAngles', 'firstQuarterOffsets','secondQuarterOffsets','laneGap', 'going', 'risers', 'windersPerQuarter', 'middleSteps', 'entrySteps', 'nosing', 'wel', 'landingLength','landingRiser'].includes(key))) {
     model.engineering = { ...model.engineering, escapeWinderWidth: null };
     if (['type', 'width', 'stringerThickness'].includes(key)) model.engineering.escapeWidth = null;
   }
@@ -210,8 +228,8 @@ export function editSession(session, section, key, value) {
 
 export function applyTwoQuarterReference(session, size = 'nominal') {
   const model = {...session.model, stairEnabled: true,
-    stair: {...session.model.stair, ...structuredClone(devriesNewelSettings),
-      outerDepth:size==='ifc' ? devriesIfcDepth : devriesNewelSettings.outerDepth},
+    stair: {...session.model.stair, ...structuredClone(devriesDistributedSettings),
+      outerDepth:size==='ifc' ? devriesIfcDepth : devriesDistributedSettings.outerDepth},
     joinery: {...session.model.joinery, type: 'none'},
     engineering: {...session.model.engineering, escapeWidth: null, escapeWinderWidth: null}};
   return {...session, model, history: [...session.history.slice(-49), session.model], future: []};

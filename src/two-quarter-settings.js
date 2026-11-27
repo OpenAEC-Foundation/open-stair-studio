@@ -1,6 +1,7 @@
 export const twoQuarterDefaults = {
   twoQuarterLayout: 'automatic', outerLength: null, outerDepth: null, middleOffset: 0,
-  firstQuarterAngles: [22.5,22.5,22.5,22.5], secondQuarterAngles: [22.5,22.5,22.5,22.5]
+  firstQuarterAngles: [22.5,22.5,22.5,22.5], secondQuarterAngles: [22.5,22.5,22.5,22.5],
+  firstQuarterOffsets: [], secondQuarterOffsets: []
 };
 
 export const devriesTwoQuarterSettings = {
@@ -38,6 +39,24 @@ export const devriesNewelSettings = {
 };
 
 export const devriesIfcDepth = 992.105;
+
+export const devriesDistributedSettings = {
+  ...devriesNewelSettings, going:220.5126, middleOffset:20.0335,
+  firstQuarterAngles:[18.533458,18.809089,17.919678,18.040211,16.697564],
+  secondQuarterAngles:[17.639417,17.746161,16.944979,18.731450,18.937993],
+  // Signed millimetres normal to the riser lines in the supplier IFC.
+  // The two boundaries of the straight middle flight remain anchored.
+  firstQuarterOffsets:[-0.105,-0.099281,-11.220944,-15.248126,-18.630004],
+  secondQuarterOffsets:[3.135189,-0.011552,7.868482,0.000061,0]
+};
+
+export function quarterOffsetError(offsets, treadCount) {
+  if (!Array.isArray(offsets) || offsets.length > 8 ||
+      (offsets.length && (offsets.length < 2 || (treadCount !== undefined && offsets.length !== treadCount))))
+    return 'Geef één grensverschuiving per verdreven trede op of kies de automatische verdeling.';
+  if (!Array.from(offsets).every(Number.isFinite)) return 'Elke grensverschuiving moet een eindige maat in millimeters zijn.';
+  return null;
+}
 
 export function equalQuarterAngles(count) {
   const increment = Number((90 / count).toFixed(3));

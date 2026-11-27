@@ -115,7 +115,7 @@ def check(page, download):
 
     page.get_by_role('button', name='De Vries-voorbeeld toepassen', exact=False).click()
     assert page.locator('#two-quarter-layout').input_value() == 'dimensioned'
-    assert float(page.locator('#middle-offset').input_value()) == 20.034
+    assert float(page.locator('#middle-offset').input_value()) == 20.0335
     assert page.locator('#turn-direction').input_value() == 'right'
     for hand, size in [('left', (3140, 992)), ('right', (3140, 992)), ('right', (3300, 1100))]:
         fitted = size == (3140, 992)
@@ -130,6 +130,8 @@ def check(page, download):
         else:
             page.locator('#lowerNewelEnabled').uncheck()
             page.locator('#upperNewelEnabled').uncheck()
+            page.get_by_role('button', name='Verschuivingen onderkwart op nul').click()
+            page.get_by_role('button', name='Verschuivingen bovenkwart op nul').click()
         set_mm('#outer-length', size[0])
         set_mm('#outer-depth', size[1])
         if not fitted:
@@ -137,7 +139,7 @@ def check(page, download):
                 set_mm('#upper-quarter-' + str(index), angle)
         project_path = download('Opslaan', '.oss.json')
         settings = json.loads(project_path.read_text(encoding='utf-8'))['stair']
-        assert settings['firstQuarterAngles'][0] == 18.533
+        assert settings['firstQuarterAngles'][0] == 18.533458
         assert settings['upperNewelEnabled'] == fitted
         if not fitted:
             assert settings['secondQuarterAngles'] == [15, 17, 19, 20, 19]
@@ -157,12 +159,20 @@ def check(page, download):
             assert data['Pockets'] == (6 if depth else 0)
         props = element.get_pset(model.by_type('IfcStair')[0], 'Pset_OpenStairStudio_Design')
         assert props['TwoQuarterLayout'] == 'dimensioned' and 'WindersPerQuarter' not in props
-        assert props['MiddleStraightOffset_mm'] == 20.034
+        assert props['MiddleStraightOffset_mm'] == 20.0335
         assert (props['DesignOuterLength_mm'], props['DesignOuterDepth_mm']) == size
         for prefix, angles in [('Lower', settings['firstQuarterAngles']), ('Upper', settings['secondQuarterAngles'])]:
             assert props[prefix + 'QuarterWinders'] == len(angles)
             values = [props[f'{prefix}QuarterAngle{i+1:02}'] for i in range(len(angles))]
             np.testing.assert_allclose(np.degrees(values), angles)
+        td4 = next(p for p in model.by_type('IfcPlate') if p.Tag.endswith('-TD-04'))
+        data = element.get_pset(td4, 'OSS_Tredeverdrijving')
+        if fitted:
+            assert data['Quarter'] == 'lower' and data['IndexInQuarter'] == 4
+            assert data['FrontBoundaryOffset_mm'] == props['LowerQuarterBoundaryOffset04_mm']
+            assert data['BackBoundaryOffset_mm'] == settings['firstQuarterOffsets'][4]
+        else:
+            assert not data and 'LowerQuarterBoundaryOffset04_mm' not in props
         meshes = [n['attributes']['usd::usdgeom::mesh']['points'] for n in json.loads(layer_path.read_text(encoding='utf-8'))['data']
                   if 'usd::usdgeom::mesh' in n['attributes']]
         np.testing.assert_allclose(sorted(np.ptp(np.vstack(meshes), axis=0)[:2] * 1000, reverse=True), size, atol=.02, rtol=0)
@@ -185,10 +195,30 @@ def check(page, download):
     page.get_by_role('button', name='De Vries-voorbeeld toepassen').click()
     assert float(page.locator('#outer-depth').input_value()) == 992.105
     assert page.locator('svg polygon.plan-newel').count() == 2
+    shift = page.get_by_role('spinbutton', name='Verschuiving grens vóór trede 4 (mm)', exact=True)
+    new_position = float(shift.input_value()) + 3
+    set_mm('#lower-quarter-offset-3', new_position)
     page.locator('#stair-mark').fill('BRONMAAT')
     page.locator('#stair-mark').press('Tab')
     saved_source = download('Opslaan', '.oss.json')
-    assert json.loads(saved_source.read_text(encoding='utf-8'))['stair']['outerDepth'] == 992.105
+    saved = json.loads(saved_source.read_text(encoding='utf-8'))['stair']
+    assert saved['outerDepth'] == 992.105 and saved['firstQuarterOffsets'][3] == new_position
+    project_file.set_input_files(saved_source)
+    page.get_by_text('BRONMAAT · Dichte steektrap', exact=True).first.wait_for()
+    bim.click()
+    edited = verify_download_pair(download(panel.get_by_role('button', name='IFC4 exporteren'), '.ifc'),
+                                  download(panel.get_by_role('button', name='IFCX alpha exporteren'), '.ifcx'), {'BRONMAAT'})
+    edited4 = next(p for p in edited.by_type('IfcPlate') if p.Tag.endswith('-TD-04'))
+    assert element.get_pset(edited4,'OSS_Tredeverdrijving')['FrontBoundaryOffset_mm'] == new_position
+    page.get_by_role('tab', name='Werkstroom Werkvoorbereiding').click()
+    page.get_by_role('navigation', name='Werkvoorbereiding weergave').get_by_role('button',name='Tredeblad').click()
+    page.locator('#wvb-tread').select_option(edited4.Tag)
+    assert 'POLYLINE' in download('Tredecontour DXF','.dxf').read_text(encoding='utf-8')
+    page.get_by_role('button',name='Trede frezen',exact=True).click()
+    nc = download('Tredeprogramma (.ngc)', '.ngc').read_text(encoding='utf-8')
+    cam = json.loads(download('Trede-CAM (.json)', '.json').read_text(encoding='utf-8'))
+    assert cam['partId'] == edited4.Tag and cam['windingDistribution']['frontOffsetMm'] == new_position
+    assert 'Winder lower quarter, tread 4' in nc and 'G1 Z-' in nc and nc.endswith('M2\n')
 
     config = json.loads((EXAMPLES / 'zes-trapontwerpen.oss.json').read_text(encoding='utf-8'))
     items = [i for i in config['stairwell']['instances'] if i['type'] in ('portable', 'ladder')]

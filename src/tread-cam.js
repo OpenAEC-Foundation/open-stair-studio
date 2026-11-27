@@ -283,6 +283,7 @@ export function compileTreadJob(part, settings = defaultTreadCam, metadata = {})
   const passes = Math.ceil(totalDepth/stepDown);
   if (!Array.isArray(part.nose) || part.nose.length !== 2 || !part.nose.every(finite)) throw new Error('De voorrand van de trede ontbreekt.');
   return { partId:part.id, metadata,parameters,stock,offset,contour,nose:part.nose.map(place),tongues,path,reliefs,totalDepth,
+    ...(part.windingDistribution ? {windingDistribution:part.windingDistribution} : {}),
     ...(part.newelJoints?.length ? {newelJoints:part.newelJoints} : {}),
     ...(part.riserPockets?.length?{priorGrooves:part.riserPockets.map(p=>({id:p.id,face:p.face,depth:p.depth,riserId:p.riserId}))}:{}),
     ...(part.noseDetail?{secondaryOperation:{feature:'upperNosing',kind:part.noseDetail.kind,sizeMm:part.noseDetail.sizeMm,
@@ -302,6 +303,10 @@ export function writeTreadLinuxCnc(job) {
     '(Spoilboard. Secure tread and offcut independently for the entire through cut. No tabs.)'
   ];
   const contourBlocks = path.slice(1).map((p,i)=>'G1 '+xy(p)+(i === 0 ? ' F'+f(cam.cutFeed) : ''));
+  if (job.windingDistribution) {
+    const {quarter,index,frontOffsetMm,backOffsetMm} = job.windingDistribution;
+    lines.push('(Winder '+quarter+' quarter, tread '+index+'. Riser line offsets front '+f(frontOffsetMm)+' / back '+f(backOffsetMm)+' mm.)');
+  }
   for (const joint of job.newelJoints??[]) {
     lines.push('(Tread outline includes newel '+cncIdentifier(joint.postId)+' / '+(joint.depth>0?'housing depth '+f(joint.depth)+' mm':'butt joint')+'.)');
   }

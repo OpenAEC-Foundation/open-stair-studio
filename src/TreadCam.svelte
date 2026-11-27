@@ -114,6 +114,10 @@
   </header>
 
   {#if job}
+    {#if job.windingDistribution}
+      {@const winding = job.windingDistribution}
+      <p class="distribution">{winding.quarter==='lower'?'Onderkwart':'Bovenkwart'} · trede {winding.index} · correctie stootbordlijn vóór {mm(winding.frontOffsetMm)} mm, achter {mm(winding.backOffsetMm)} mm</p>
+    {/if}
     {#if job.secondaryOperation}
       <p class="nose-operation"><b>Vervolg op contourprogramma</b> · {job.secondaryOperation.instruction} Behoud de volle dikte van de insteeklippen.</p>
     {/if}
@@ -220,6 +224,7 @@
 <style>
   .tread-cam { max-width: 100%; }
   .nose-operation { grid-column:1/-1; padding:6px 10px; border-left:3px solid var(--oa-accent); }
+  .distribution { grid-column:1/-1; }
   .tread-cam h2 { font: 600 13px var(--oa-font-heading); margin: 0; }
   .tread-cam p { font: 11px/1.5 var(--oa-font-body); color: var(--oa-text-secondary); }
   .drawing { background: var(--oa-panel); border: 1px solid var(--oa-border); padding: 12px; }
