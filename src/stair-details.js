@@ -178,8 +178,8 @@ function riserParts(stair,geometry) {
       const q=points[(i+1)%points.length];
       return s+p.x*q.y-q.x*p.y;
     },0))/2;
-    parts.push({id,label:'Houten stootbord',kind:'plate',material:'timber',heightMm:top-bottom,...riserStock(points,direction,top-bottom,stair.riserThickness),
-      planPoints:points,direction,thicknessMm:stair.riserThickness,volumeM3:planArea*(top-bottom)/1e9,faces:prism(points,bottom,top)});
+    parts.push({id,label:'Houten stootbord',kind:'plate',material:'timber',heightMm:top-bottom,...riserStock(points,direction,top-bottom,stair.riserThickness,bottom),
+      direction,thicknessMm:stair.riserThickness,volumeM3:planArea*(top-bottom)/1e9,faces:prism(points,bottom,top)});
   };
   // Standard boards stand vertically against the lower tread back and below
   // the next tread. The optional manual profile remains an explicit sloped detail.
@@ -200,7 +200,7 @@ function riserParts(stair,geometry) {
       const width=Math.hypot(b.x-a.x,b.y-a.y);
       parts.push({id:t.id+'-SB',label:'Houten stootbord',kind:'plate',role:'riser',material:'timber',
         heightMm:height,developedHeightMm:height,topInsetMm:0,bottomInsetMm:thickness,
-        profileContour,...riserStock(points,d,height,thickness),thicknessMm:thickness,
+        profileContour,...riserStock(points,d,height,thickness,bottom),thicknessMm:thickness,
         volumeM3:width*height*thickness/1e9,faces:prism(points,bottom,top)});
       return;
     }

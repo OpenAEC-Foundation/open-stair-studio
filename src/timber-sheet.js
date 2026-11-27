@@ -140,7 +140,7 @@ export function timberViews(row, stationIndex = 0) {
   if (row.type === 'tread') return treadViews(row.part);
   if (row.type === 'handrail') return railViews(row.part);
   if (row.type === 'riser' || row.type === 'nosingStrip') {
-    if (row.type==='riser' && row.part.planPoints && row.part.joineryFeatures?.length) return winderRiserViews(row.part);
+    if (row.type==='riser' && row.part.direction && row.part.planPoints && row.part.joineryFeatures?.length) return winderRiserViews(row.part);
     const p=row.part, top=diagram('Plankvoet · bovenaanzicht',[line(p.faceContour)],'Lokale X langs de voorrand. Y loopt van de zichtzijde naar achteren.');
     if (row.type==='nosingStrip') return [top,diagram('Wellat · dwarsdoorsnede',[line(p.profileContour)],'Gemeten loodrecht op de lengteas van de wellat.')];
     if (p.joineryFeatures?.length) {

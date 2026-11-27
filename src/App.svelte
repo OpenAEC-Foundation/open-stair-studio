@@ -443,6 +443,8 @@
   const updateJoinery = (key, value) => updateRoot('joinery', key, value);
   const updateCam = (key, value) => updateRoot('cam', key, value);
   const updateTreadCam = (key, value) => updateRoot('treadCam', key, value);
+  const updateRiserCam = (key, value) => updateRoot('riserCam', key, value);
+  const updateRiserDetailCam = (key, value) => updateRoot('riserDetailCam', key, value);
   const updateEngineering = (key, value) => updateRoot('engineering', key, value);
   function openTreadCam(id) {
     selectedTreadId = id;
@@ -606,7 +608,7 @@
       {:else if !timberSystem && ['Calculatie', 'Trede-CNC', 'CNC-machine', 'Wangbladen','Houtdetails','Bordesraam'].includes(activeView)}
         <div class="production-view"><h1>{materialLabel}</h1><p>{activeView === 'Calculatie' ? 'Vraag een productprijs aan op basis van de tredecontouren, de productopbouw en de opleggingen in het dossier.' : 'Voor dit tredesysteem zijn de nominale contouren en het engineeringdossier beschikbaar. De freesprofielen in deze versie horen bij massiefhouten tredeverbindingen.'}</p><div class="button-row"><button class="action-btn" onclick={() => selectRibbon('Engineering')}>Engineeringdossier openen</button><button class="action-btn" onclick={() => activeView = 'Onderdelen'}>Tredecontouren bekijken</button></div></div>
       {:else if activeView === 'Houtdetails'}
-        <TimberDetailSheet {model} geometry={workshop} {details} {downloadFile}/>
+        <TimberDetailSheet {model} geometry={workshop} {details} {downloadFile} {updateRiserCam} {updateRiserDetailCam}/>
       {:else if activeView === 'Onderdelen'}
         <div class="production-view"><div class="production-head"><div><span class="eyebrow">WERKVOORBEREIDING · CONCEPT</span><h1>{sheetMode === 'detail' ? 'Tredeblad' : 'Onderdelenstaat'}</h1><p>Afgeleid van de huidige geometrie · {model.stair.mark} · revisie {model.project.revision}</p></div><div class="button-row"><button class="action-btn" onclick={exportPartsCsv}>CSV</button><button class="action-btn" onclick={printPdf}><Icon name="file.export" /> PDF / afdrukken</button></div></div><div class="production-summary"><div><span>Traptype</span><b>{dimensions.family.label}</b></div><div><span>Houtsoort</span><b>{model.stair.material}</b></div><div><span>Vloerhoogte</span><b>{model.stair.floorHeight} mm</b></div><div><span>Netto houtvolume</span><b>{workshop.volume.toFixed(3)} m³</b></div></div>
           {#if hasTreadSheets || sheetMode === 'detail'}

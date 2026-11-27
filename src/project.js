@@ -4,10 +4,11 @@ import { readWell } from './stairwell.js';
 import {timberDimensions, timberStyles, noseNames} from './timber-settings.js';
 import { validateCamField } from './housing-cam.js';
 import { validateTreadCamField } from './tread-cam.js';
+import { validateRiserCamField } from './riser-board-settings.js';
 import { defaultEngineering, validateEngineeringField, materialFieldKeys, structureTypes } from './engineering.js';
 
 export const draftKey = 'open-stair-studio:draft';
-const sections = ['project', 'bim', 'stair', 'regulatory', 'building', 'estimate', 'joinery', 'cam', 'treadCam', 'engineering'];
+const sections = ['project', 'bim', 'stair', 'regulatory', 'building', 'estimate', 'joinery', 'cam', 'treadCam', 'riserCam', 'riserDetailCam', 'engineering'];
 const systemFields = ['support', 'sourceProduct', 'productBasis', 'arrangement', 'customDescription', 'spanMm', ...materialFieldKeys];
 const systemValues = engineering => Object.fromEntries(systemFields.map(key => [key, engineering[key]]));
 const ranges = {
@@ -51,6 +52,7 @@ function readField(section, key, value) {
   if (key === 'profile' && !ruleProfiles.some(profile => profile.id === value)) throw new Error('Onbekend regelprofiel.');
   if (section === 'cam') return validateCamField(key, value);
   if (section === 'treadCam') return validateTreadCamField(key, value);
+  if (section === 'riserCam' || section === 'riserDetailCam') return validateRiserCamField(key, value);
   if (section === 'engineering') return validateEngineeringField(key, value);
   if (section === 'estimate' && key === 'treadStock' && !['board', 'cnc'].includes(value)) throw new Error('Kies de ruwmaat of de CNC-opspanmaat voor de treden.');
   if (section === 'stair' && key === 'type' && !stairFamilies.some(family => family.id === value)) throw new Error('Onbekende trapfamilie.');

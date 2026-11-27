@@ -2,6 +2,12 @@
 
 OpenAEC desktopsoftware voor parametrisch trapontwerp, berekeningen, werkvoorbereiding, CNC-voorbereiding en IFC4-uitwisseling.
 
+## Nieuw in 0.13.19
+
+- Kies onder **Houtdetails → Stootborden** het onderdeelmerk en klik op **Stootbord frezen**. Het blad levert LinuxCNC-programma’s voor de lippen, schouders en kopvlakken van het verticale bord. Bij een verdreven kwartslag of halfslag volgen de banen de draairichting en de ingestelde neuspositie.
+- Elk programma hoort bij één vaste opspanning. Het werkblad geeft het referentiepunt op de ruwplank, de richting van de machineassen en de benodigde frees. Bij een inspringend verstek kan een aanvullende opspanning met een kleinere detailfrees nodig zijn. De twee gereedschapsprofielen worden bij het project opgeslagen.
+- De controle vergelijkt de stootbordlippen met de groeven in de treden, bomen en bordessen. Onvoldoende snijlengte of resthout dat de aansluiting verhindert geeft een melding op het stootbordblad.
+
 ## Nieuw in 0.13.18
 
 - Houten kwartslag- en halfslagtrappen met verdreven treden ondersteunen ingefreesde stootborden, linksom en rechtsom. Bij het verplaatsen van de neus volgen de trede, de oplegging van het volgende stootbord, de lippen en de bijbehorende groeven.

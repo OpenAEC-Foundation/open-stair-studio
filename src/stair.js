@@ -7,6 +7,7 @@ import { buildStairViews } from './stair-views.js';
 import { buildLandingFrame } from './landing-frame.js';
 import { makeCutStringer } from './cut-stringer.js';
 import { defaultCam } from './housing-cam.js';
+import { defaultRiserCam, defaultRiserDetailCam } from './riser-board-settings.js';
 import { defaultTreadCam } from './tread-cam.js';
 import { defaultEngineering } from './engineering.js';
 import { defaultHousingSettings } from './housings.js';
@@ -34,10 +35,12 @@ export const ruleProfiles = [
 export const starterProject = {
   schema: 'https://openaec.foundation/schemas/open-stair-studio/project-0.13.json',
   app: 'Open Stair Studio',
-  version: '0.13.18',
+  version: '0.13.19',
   stairEnabled: true,
   stairwell: structuredClone(emptyWell),
   treadCam: { ...defaultTreadCam },
+  riserCam: { ...defaultRiserCam },
+  riserDetailCam: { ...defaultRiserDetailCam },
   engineering: { ...defaultEngineering },
   joinery: { type: 'housed', ...defaultHousingSettings },
   cam: { ...defaultCam },

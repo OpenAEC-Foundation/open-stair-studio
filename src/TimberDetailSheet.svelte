@@ -2,11 +2,13 @@
   import { tick } from 'svelte';
   import TimberProfileDrawing from './TimberProfileDrawing.svelte';
   import RiserGrooveSheet from './RiserGrooveSheet.svelte';
+  import RiserBoardCamSheet from './RiserBoardCamSheet.svelte';
   import { riserFaceResults } from './riser-face-cam.js';
   import { groupNames, mm, stockText, timberSheetParts, timberViews, timberDetailDxf } from './timber-sheet.js';
-  export let model, geometry, details, downloadFile;
+  export let model, geometry, details, downloadFile, updateRiserCam, updateRiserDetailCam;
 
   let requestedType = 'tread', requestedId = '', selectedStation = null, printList = false;
+  let showRiserCam = false;
   $: rows = timberSheetParts(geometry, details);
   $: types = Object.keys(groupNames).filter(type => rows.some(r => r.type === type));
   $: type = types.includes(requestedType) ? requestedType : types[0];
@@ -25,7 +27,10 @@
   function chunks(list, size) {
     return Array.from({length:Math.ceil(list.length/size)}, (_,i) => list.slice(i*size, (i+1)*size));
   }
-  function choose(type, id = '') { requestedType=type; requestedId=id; selectedStation=null; }
+  function choose(type, id = '') {
+    requestedType=type; requestedId=id; selectedStation=null;
+    if(type!=='riser') showRiserCam=false;
+  }
   async function print(all) { printList=all; await tick(); window.print(); }
   const stationForm = s => s.section === 'rond' ? 'Ø ' + mm(s.widthMm) : stockText([s.widthMm,s.depthMm]);
 </script>
@@ -42,11 +47,21 @@
           {#each stations as s,i}<option value={i}>{mm(s.atMm)} mm · {s.section}</option>{/each}</select></label>
       {/if}
       <div class="commands">
+        {#if row.type==='riser'}
+          <button class="action-btn" aria-pressed={showRiserCam} onclick={() => showRiserCam=!showRiserCam}>{showRiserCam?'Terug naar stootbordblad':'Stootbord frezen'}</button>
+        {/if}
+        {#if !(row.type==='riser' && showRiserCam)}
         <button class="action-btn" disabled={!!housingIssue||!!part.fabricationIssue} onclick={() => downloadFile(row.id+'-houtdetail.dxf',timberDetailDxf(row,views),'application/dxf')}>Detail-DXF</button>
         <button class="action-btn" onclick={() => print(false)}>Detailblad PDF</button>
+        {/if}
         <button class="action-btn" onclick={() => print(true)}>Maatstaat PDF</button>
       </div>
     </div>
+    {#if row.type==='riser' && showRiserCam}
+      <div class:skip-print={printList}>
+        <RiserBoardCamSheet {part} {model} {geometry} {downloadFile} {updateRiserCam} {updateRiserDetailCam} />
+      </div>
+    {:else}
     <article class="paper" class:skip-print={printList}>
       <header class="sheet-title">
         <div><p>{model.project.number} · {model.project.name} · revisie {model.project.revision}</p><h2>{row.id}</h2></div>
@@ -66,7 +81,7 @@
       <RiserGrooveSheet results={grooveResults} {model} {downloadFile}/>
       {#if part.joineryFeatures?.length}
         <h3>Insteeklippen stootbord</h3>
-        {#if part.planPoints}
+        {#if part.planPoints && part.direction}
           <p>De tabel geeft de uiterste lipmaten. Meet de breedte vanaf het meest rechtse punt van het bordlichaam naar links bij oplopen, de hoogte vanaf de voet en de dikte vanaf de zichtzijde. Het bovenaanzicht toont de schuine kopvlakken.</p>
           <p><b>Hoekpunten bordlichaam (breedte / dikte in mm)</b><br/>{views[0].paths[0].points.map(q=>mm(q.x)+' / '+mm(q.y)).join(' · ')}</p>
         {:else}
@@ -97,6 +112,7 @@
       {/each}
       <div class="calibration"><span class="gauge"></span><span>Controlemaat 50 mm bij afdruk op 100%</span></div>
     </article>
+    {/if}
     {#if printList}
       <div class="schedule">{#each schedulePages as page,i}
         <article class="paper schedule-page">

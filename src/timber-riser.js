@@ -13,11 +13,18 @@ function boardOutline(points,d) {
   return local.map(p=>({x:p.x-minX,y:p.y-minY}));
 }
 
-export function riserStock(points,d,height,thickness) {
+export function riserStock(points,d,height,thickness,bottomZ) {
   const faceContour=boardOutline(points,d);
   const length=Math.max(...faceContour.map(p=>p.x));
-  return {role:'riser',profileName:'Stootbord op zijcontour',faceContour,lengthMm:length,
+  const stock={role:'riser',profileName:'Stootbord op zijcontour',faceContour,lengthMm:length,
     stockLengthMm:length,stockWidthMm:height,stockThicknessMm:thickness,stockVolumeM3:length*height*thickness/1e9};
+  if (bottomZ===undefined) return stock; // Inclined board with a developed section.
+  const n={x:-d.y,y:d.x};
+  const first=axis=>Math.min(...points.map(p=>p.x*axis.x+p.y*axis.y));
+  const u=first(d),v=first(n);
+  return {...stock,planPoints:signedArea(points)<0?[...points].reverse():points,
+    riserFrame:{origin:{x:u*d.x+v*n.x,y:u*d.y+v*n.y,z:bottomZ},
+      xAxis:{...d,z:0},yAxis:{...n,z:0},zAxis:{x:0,y:0,z:1}}};
 }
 
 export function nosingStrip(tread,stair,clipStrip,back) {
